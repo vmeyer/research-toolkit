@@ -1,31 +1,37 @@
 {
   "id": "workflow-1772111917366",
   "name": "research-and-summarize",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "nodes": [
     {
       "id": "start-1",
       "type": "start",
       "name": "start-1",
-      "position": {
-        "x": 100,
-        "y": 400
-      },
+      "position": { "x": 100, "y": 400 },
+      "data": { "label": "Start" }
+    },
+    {
+      "id": "intake-1",
+      "type": "subAgent",
+      "name": "intake-1",
+      "position": { "x": 400, "y": 400 },
       "data": {
-        "label": "Start"
+        "description": "Clarify research topic iteratively and produce research brief with sub-briefs",
+        "prompt": "You are a Research Intake Agent. Clarify the research topic iteratively with the user (max 5 questions, one at a time). Determine research depth (quick/standard/deep), output formats, and language. Split the topic into 2-4 Sub-Briefs for parallel researchers. Derive a topic slug. Output a structured RESEARCH BRIEF with all configuration and sub-briefs.",
+        "tools": "AskUserQuestion",
+        "model": "opus",
+        "color": "pink",
+        "outputPorts": 1
       }
     },
     {
       "id": "researcher-1",
       "type": "subAgent",
       "name": "researcher-1",
-      "position": {
-        "x": 400,
-        "y": 400
-      },
+      "position": { "x": 700, "y": 400 },
       "data": {
-        "description": "Research the topic using web search",
-        "prompt": "You are a thorough research agent. Research the user's topic by searching the web and reading relevant sources. Gather comprehensive information including key facts, different perspectives, recent developments, and notable sources.\n\nYou MUST structure your output in the following handoff format:\n\n## RESEARCH HANDOFF: Researcher -> Analyzer\n\n### Topic\nThe exact topic or question being researched.\n\n### Sources Consulted\nFor each source:\n- **Title**: Source title\n- **URL**: Source URL\n- **Type**: (academic | news | documentation | blog | official)\n- **Reliability**: (high | medium | low) with brief justification\n\n### Key Facts\nNumbered list of verified factual findings. Each fact must cite its source by title.\n\n### Perspectives & Viewpoints\nDistinct perspectives found across sources. Note where sources agree and disagree.\n\n### Recent Developments\nAnything from the last 12 months that is relevant. Include dates.\n\n### Raw Data & Statistics\nAny quantitative data, benchmarks, or statistics found. Include units and context.\n\n### Gaps & Limitations\nWhat could NOT be found or verified. What areas need deeper investigation.\n\n### Open Questions\nQuestions that emerged during research that the analyzer should consider.\n\nKeep each section concise. Prioritize breadth of coverage over depth in any single source. Max ~1500 tokens total.",
+        "description": "Research a sub-brief using web search with triangulation strategy (N instances run in parallel at runtime)",
+        "prompt": "You are a research agent. Execute the assigned Sub-Brief using triangulation search strategy: 3-4 query variations, 3+ source types, dual-source backing, WebFetch on 3-5 sources, follow citation chains, search for counter-arguments. Adapt to the configured depth (quick/standard/deep). Output a structured RESEARCH HANDOFF with sources, facts, perspectives, counter-arguments, and gaps.",
         "tools": "WebSearch, WebFetch, Read",
         "model": "sonnet",
         "color": "blue",
@@ -33,55 +39,13 @@
       }
     },
     {
-      "id": "analyzer-1",
-      "type": "subAgent",
-      "name": "analyzer-1",
-      "position": {
-        "x": 700,
-        "y": 400
-      },
-      "data": {
-        "description": "Analyze findings and identify key themes",
-        "prompt": "You are an analytical agent. You will receive a structured research handoff document with the following sections: Topic, Sources Consulted, Key Facts, Perspectives & Viewpoints, Recent Developments, Raw Data & Statistics, Gaps & Limitations, and Open Questions.\n\nYour job is to synthesize and analyze these raw findings. Do the following:\n\n1. **Cross-reference facts** across sources — flag contradictions or unverified claims\n2. **Identify themes** — cluster related findings into 3-5 coherent themes\n3. **Weigh source reliability** — discount low-reliability sources, elevate convergent high-reliability findings\n4. **Resolve open questions** where the data allows, flag remaining unknowns\n5. **Assess completeness** — is the research sufficient for a useful summary, or are there critical gaps?\n\nYou MUST structure your output as follows:\n\n## ANALYSIS HANDOFF: Analyzer -> Output Formatter\n\n### Research Quality Assessment\nBrief assessment of source coverage, reliability spread, and any critical gaps.\n\n### Themes\nFor each theme (3-5):\n- **Theme name**: Descriptive title\n- **Key findings**: What the evidence shows\n- **Confidence**: (high | medium | low) based on source agreement and reliability\n- **Supporting sources**: Which sources back this up\n\n### Contradictions & Tensions\nWhere sources disagree and what the likely truth is.\n\n### Key Takeaways\nRanked list of the most important findings (max 7).\n\n### Remaining Unknowns\nWhat we still don't know and why it matters.\n\nMax ~1500 tokens total.",
-        "model": "sonnet",
-        "color": "purple",
-        "outputPorts": 1
-      }
-    },
-    {
-      "id": "ask-verify-1",
-      "type": "askUserQuestion",
-      "name": "ask-verify-1",
-      "position": {
-        "x": 1000,
-        "y": 400
-      },
-      "data": {
-        "questionText": "Would you like to verify and supplement the research quality before generating output?",
-        "options": [
-          {
-            "label": "Verify Research",
-            "description": "A verification agent reviews quality, fills gaps with additional web research, and produces an enhanced analysis"
-          },
-          {
-            "label": "Skip to Output",
-            "description": "The analysis looks good — proceed directly to choosing an output format"
-          }
-        ],
-        "outputPorts": 2
-      }
-    },
-    {
       "id": "verifier-1",
       "type": "subAgent",
       "name": "verifier-1",
-      "position": {
-        "x": 1300,
-        "y": 200
-      },
+      "position": { "x": 1000, "y": 400 },
       "data": {
-        "description": "Verify research quality and supplement gaps",
-        "prompt": "You are a research quality verification and supplementation agent. You have access to web search tools to do your own additional research.\n\nYou will receive the full conversation context containing:\n1. The original user topic/question\n2. The RESEARCH HANDOFF from the Researcher\n3. The ANALYSIS HANDOFF from the Analyzer\n\n## YOUR TASK\n\nPerform a rigorous quality review of the research and analysis:\n\n### Step 1: Evaluate Against Original Question\n- Does the research actually answer the user's original question/topic?\n- Are there aspects of the question that were missed or only superficially covered?\n- Is the scope appropriate — not too narrow, not too broad?\n\n### Step 2: Assess Source Quality\n- Are there enough high-reliability sources? (minimum 3 recommended)\n- Is there over-reliance on a single source or source type?\n- Are there obvious authoritative sources that should have been consulted but weren't?\n\n### Step 3: Check for Gaps\n- Are any of the 'Remaining Unknowns' actually answerable with more research?\n- Are the 'low confidence' themes improvable?\n- Are there missing perspectives (e.g., only one side of a debate covered)?\n\n### Step 4: Supplementary Research (if needed)\nIf you identified gaps in Steps 1-3, USE YOUR WEB SEARCH TOOLS to:\n- Find additional sources for low-confidence themes\n- Verify unverified claims\n- Fill in missing perspectives\n- Answer resolvable 'Remaining Unknowns'\n\n### Step 5: Produce Enhanced Output\n\nYou MUST output a complete, enhanced analysis handoff that REPLACES the original. Use the same format but with improvements incorporated:\n\n## VERIFIED ANALYSIS HANDOFF: Verifier -> Output Formatter\n\n### Verification Summary\n- **Original quality score**: (1-10)\n- **Enhanced quality score**: (1-10)\n- **Changes made**: Brief list of what was added, corrected, or strengthened\n- **Sources added**: Count of new sources consulted\n\n### Research Quality Assessment\n(Enhanced version — incorporate new findings)\n\n### Themes\n(Enhanced version — upgraded confidence levels where new evidence found, added new themes if warranted)\nFor each theme (3-5):\n- **Theme name**: Descriptive title\n- **Key findings**: What the evidence shows\n- **Confidence**: (high | medium | low)\n- **Supporting sources**: Which sources back this up\n- **Verification note**: What changed from original analysis (if anything)\n\n### Contradictions & Tensions\n(Enhanced — resolve any that new evidence clarified)\n\n### Key Takeaways\nRanked list of the most important findings (max 7).\n\n### Remaining Unknowns\n(Reduced list — only truly unresolvable items remain)\n\nMax ~2000 tokens total.",
+        "description": "Synthesize parallel research results, analyze themes, and verify quality",
+        "prompt": "You are a research synthesis and verification agent. Merge all Research Handoffs, cross-reference facts, identify 3-5 themes, weigh source reliability, check brief alignment, fill gaps via web search, build a deduplicated Source Index, and assess completeness (1-10). Output a VERIFIED ANALYSIS HANDOFF with Source Index, themes, contradictions, takeaways, and configuration pass-through.",
         "tools": "WebSearch, WebFetch, Read",
         "model": "opus",
         "color": "yellow",
@@ -89,65 +53,13 @@
       }
     },
     {
-      "id": "ask-format-1",
-      "type": "askUserQuestion",
-      "name": "ask-format-1",
-      "position": {
-        "x": 1600,
-        "y": 400
-      },
-      "data": {
-        "questionText": "What format would you like the final summary in?",
-        "options": [
-          {
-            "label": "Brief Summary",
-            "description": "A concise 2-3 paragraph executive summary"
-          },
-          {
-            "label": "Detailed Report",
-            "description": "A comprehensive multi-section report with citations"
-          },
-          {
-            "label": "Bullet Points",
-            "description": "Key findings as organized bullet points"
-          },
-          {
-            "label": "Key Point Extractor",
-            "description": "Structured key points, methods, and patterns optimized for skill creation"
-          }
-        ],
-        "multiSelect": true,
-        "outputPorts": 1
-      }
-    },
-    {
-      "id": "brief-1",
-      "type": "subAgent",
-      "name": "brief-1",
-      "position": {
-        "x": 1900,
-        "y": 0
-      },
-      "data": {
-        "description": "Write brief summary and save to file",
-        "prompt": "You are a concise writer. You will receive an analysis handoff (either standard or verified/enhanced) with Themes, Key Takeaways, and Contradictions. Using this analyzed research, produce a brief executive summary of 2-3 paragraphs. Focus on the most important takeaways, key conclusions, and actionable insights. Keep it clear and to the point. Cite sources where relevant.\n\n## FILE OUTPUT (MANDATORY)\n\nAfter generating your summary, you MUST save it to a markdown file:\n\n1. **Derive the topic slug** from the research topic in the handoff. Convert to lowercase, replace spaces with hyphens, remove special characters. Example: \"Quantum Computing in Healthcare\" becomes \"quantum-computing-in-healthcare\".\n\n2. **Create the folder** if it does not exist:\n   ```\n   mkdir -p ./research/<topic-slug>\n   ```\n\n3. **Check for existing versions** by listing files matching `brief-summary*.md` in that folder.\n\n4. **Determine the filename**:\n   - If no file exists: `brief-summary.md`\n   - If `brief-summary.md` exists: `brief-summary-v2.md`\n   - If `brief-summary-v2.md` exists: `brief-summary-v3.md`\n   - Continue incrementing the version number.\n\n5. **Write the file** with a YAML frontmatter header:\n   ```markdown\n   ---\n   type: brief-summary\n   topic: <original topic>\n   date: <current date YYYY-MM-DD>\n   version: <version number>\n   verified: <true if received VERIFIED ANALYSIS HANDOFF, false otherwise>\n   ---\n\n   # Brief Summary: <Topic>\n\n   <your summary content>\n   ```\n\n6. **Confirm** the file path to the user at the end of your output.",
-        "tools": "Bash, Write, Glob, Read",
-        "model": "sonnet",
-        "color": "green",
-        "outputPorts": 1
-      }
-    },
-    {
       "id": "detailed-1",
       "type": "subAgent",
       "name": "detailed-1",
-      "position": {
-        "x": 1900,
-        "y": 300
-      },
+      "position": { "x": 1300, "y": 100 },
       "data": {
         "description": "Write detailed report and save to file",
-        "prompt": "You are a thorough report writer. You will receive an analysis handoff (either standard or verified/enhanced) with Themes, Key Takeaways, Contradictions, and Remaining Unknowns. Using this analyzed research, produce a detailed multi-section report. Include: an introduction, methodology overview, key findings organized by theme, analysis and discussion, conclusions, and a references section citing sources. Use clear headings and structured formatting.\n\n## FILE OUTPUT (MANDATORY)\n\nAfter generating your report, you MUST save it to a markdown file:\n\n1. **Derive the topic slug** from the research topic in the handoff. Convert to lowercase, replace spaces with hyphens, remove special characters. Example: \"Quantum Computing in Healthcare\" becomes \"quantum-computing-in-healthcare\".\n\n2. **Create the folder** if it does not exist:\n   ```\n   mkdir -p ./research/<topic-slug>\n   ```\n\n3. **Check for existing versions** by listing files matching `detailed-report*.md` in that folder.\n\n4. **Determine the filename**:\n   - If no file exists: `detailed-report.md`\n   - If `detailed-report.md` exists: `detailed-report-v2.md`\n   - If `detailed-report-v2.md` exists: `detailed-report-v3.md`\n   - Continue incrementing the version number.\n\n5. **Write the file** with a YAML frontmatter header:\n   ```markdown\n   ---\n   type: detailed-report\n   topic: <original topic>\n   date: <current date YYYY-MM-DD>\n   version: <version number>\n   verified: <true if received VERIFIED ANALYSIS HANDOFF, false otherwise>\n   ---\n\n   # Detailed Report: <Topic>\n\n   <your report content>\n   ```\n\n6. **Confirm** the file path to the user at the end of your output.",
+        "prompt": "Produce a comprehensive Markdown report from the Verified Analysis Handoff: Introduction, Methodology, Findings by Theme, Analysis, Contradictions, Conclusions, References. All claims cite [Source ID]. Write to ./research/<slug>/detailed-report-v<N>.md with YAML frontmatter.",
         "tools": "Bash, Write, Glob, Read",
         "model": "sonnet",
         "color": "orange",
@@ -155,19 +67,16 @@
       }
     },
     {
-      "id": "bullets-1",
+      "id": "html-report-1",
       "type": "subAgent",
-      "name": "bullets-1",
-      "position": {
-        "x": 1900,
-        "y": 600
-      },
+      "name": "html-report-1",
+      "position": { "x": 1300, "y": 300 },
       "data": {
-        "description": "Write bullet points and save to file",
-        "prompt": "You are a structured summarizer. You will receive an analysis handoff (either standard or verified/enhanced) with Themes, Key Takeaways, and supporting evidence. Using this analyzed research, produce an organized bullet point summary. Group bullets by theme. Use nested bullets for supporting details. Include key statistics, quotes, or data points. End with a 'Key Takeaways' section of 3-5 top-level bullets.\n\n## FILE OUTPUT (MANDATORY)\n\nAfter generating your bullet points, you MUST save them to a markdown file:\n\n1. **Derive the topic slug** from the research topic in the handoff. Convert to lowercase, replace spaces with hyphens, remove special characters. Example: \"Quantum Computing in Healthcare\" becomes \"quantum-computing-in-healthcare\".\n\n2. **Create the folder** if it does not exist:\n   ```\n   mkdir -p ./research/<topic-slug>\n   ```\n\n3. **Check for existing versions** by listing files matching `bullet-points*.md` in that folder.\n\n4. **Determine the filename**:\n   - If no file exists: `bullet-points.md`\n   - If `bullet-points.md` exists: `bullet-points-v2.md`\n   - If `bullet-points-v2.md` exists: `bullet-points-v3.md`\n   - Continue incrementing the version number.\n\n5. **Write the file** with a YAML frontmatter header:\n   ```markdown\n   ---\n   type: bullet-points\n   topic: <original topic>\n   date: <current date YYYY-MM-DD>\n   version: <version number>\n   verified: <true if received VERIFIED ANALYSIS HANDOFF, false otherwise>\n   ---\n\n   # Bullet Points: <Topic>\n\n   <your bullet point content>\n   ```\n\n6. **Confirm** the file path to the user at the end of your output.",
+        "description": "Produce styled HTML report from template",
+        "prompt": "Read the HTML template from templates/report.html. Fill content between <!-- SECTION:xxx --> and <!-- /SECTION:xxx --> markers. Set meta tags, replace {{language}}, format sources as clickable references. Write to ./research/<slug>/report-v<N>.html.",
         "tools": "Bash, Write, Glob, Read",
-        "model": "sonnet",
-        "color": "cyan",
+        "model": "opus",
+        "color": "teal",
         "outputPorts": 1
       }
     },
@@ -175,16 +84,27 @@
       "id": "keypoints-1",
       "type": "subAgent",
       "name": "keypoints-1",
-      "position": {
-        "x": 1900,
-        "y": 900
-      },
+      "position": { "x": 1300, "y": 500 },
       "data": {
         "description": "Extract key points for skill creation and save to file",
-        "prompt": "You are a knowledge extraction specialist. You will receive an analysis handoff (either standard or verified/enhanced) with Themes, Key Takeaways, Contradictions, and Remaining Unknowns. Using this analyzed research, produce a structured document optimized for feeding into a skill creator. Output the following sections:\n\n## Topic / Method Name\nClear, concise name of the topic, method, or technique.\n\n## Core Concept\nOne-paragraph distillation of what this is and why it matters.\n\n## Key Principles\nNumbered list of foundational principles or rules (max 10).\n\n## Patterns & Techniques\nFor each pattern:\n- **Name**: Pattern name\n- **When to use**: Trigger conditions\n- **How it works**: Step-by-step application\n- **Pitfalls**: Common mistakes to avoid\n\n## Decision Framework\nWhen to apply this method vs. alternatives. Include decision criteria.\n\n## Practical Examples\nConcrete, minimal examples demonstrating each key technique.\n\n## References & Sources\nList of authoritative sources with URLs.\n\nKeep everything actionable, declarative, and free of filler. This output will be used as input for an automated skill creator, so structure and precision matter more than prose.\n\n## FILE OUTPUT (MANDATORY)\n\nAfter generating your key points, you MUST save them to a markdown file:\n\n1. **Derive the topic slug** from the research topic in the handoff. Convert to lowercase, replace spaces with hyphens, remove special characters. Example: \"Quantum Computing in Healthcare\" becomes \"quantum-computing-in-healthcare\".\n\n2. **Create the folder** if it does not exist:\n   ```\n   mkdir -p ./research/<topic-slug>\n   ```\n\n3. **Check for existing versions** by listing files matching `key-points*.md` in that folder.\n\n4. **Determine the filename**:\n   - If no file exists: `key-points.md`\n   - If `key-points.md` exists: `key-points-v2.md`\n   - If `key-points-v2.md` exists: `key-points-v3.md`\n   - Continue incrementing the version number.\n\n5. **Write the file** with a YAML frontmatter header:\n   ```markdown\n   ---\n   type: key-points\n   topic: <original topic>\n   date: <current date YYYY-MM-DD>\n   version: <version number>\n   verified: <true if received VERIFIED ANALYSIS HANDOFF, false otherwise>\n   ---\n\n   # Key Points: <Topic>\n\n   <your key points content>\n   ```\n\n6. **Confirm** the file path to the user at the end of your output.",
+        "prompt": "Extract structured key points from the Verified Analysis Handoff: Topic/Method Name, Core Concept, Key Principles (max 10), Patterns and Techniques, Decision Framework, Practical Examples, References. Write to ./research/<slug>/key-points-v<N>.md with YAML frontmatter.",
         "tools": "Bash, Write, Glob, Read",
-        "model": "opus",
+        "model": "sonnet",
         "color": "red",
+        "outputPorts": 1
+      }
+    },
+    {
+      "id": "brief-1",
+      "type": "subAgent",
+      "name": "brief-1",
+      "position": { "x": 1300, "y": 700 },
+      "data": {
+        "description": "Write brief summary and save to file",
+        "prompt": "Produce a 2-3 paragraph executive summary from the Verified Analysis Handoff. Cite sources using [Source ID] format. Write to ./research/<slug>/brief-summary-v<N>.md with YAML frontmatter.",
+        "tools": "Bash, Write, Glob, Read",
+        "model": "sonnet",
+        "color": "green",
         "outputPorts": 1
       }
     },
@@ -192,116 +112,24 @@
       "id": "end-1",
       "type": "end",
       "name": "end-1",
-      "position": {
-        "x": 2200,
-        "y": 400
-      },
-      "data": {
-        "label": "End"
-      }
+      "position": { "x": 1600, "y": 400 },
+      "data": { "label": "End" }
     }
   ],
   "connections": [
-    {
-      "id": "c1",
-      "from": "start-1",
-      "to": "researcher-1",
-      "fromPort": "output",
-      "toPort": "input"
-    },
-    {
-      "id": "c2",
-      "from": "researcher-1",
-      "to": "analyzer-1",
-      "fromPort": "output",
-      "toPort": "input"
-    },
-    {
-      "id": "c3",
-      "from": "analyzer-1",
-      "to": "ask-verify-1",
-      "fromPort": "output",
-      "toPort": "input"
-    },
-    {
-      "id": "c4",
-      "from": "ask-verify-1",
-      "to": "verifier-1",
-      "fromPort": "branch-0",
-      "toPort": "input"
-    },
-    {
-      "id": "c5",
-      "from": "ask-verify-1",
-      "to": "ask-format-1",
-      "fromPort": "branch-1",
-      "toPort": "input"
-    },
-    {
-      "id": "c6",
-      "from": "verifier-1",
-      "to": "ask-format-1",
-      "fromPort": "output",
-      "toPort": "input"
-    },
-    {
-      "id": "c7",
-      "from": "ask-format-1",
-      "to": "brief-1",
-      "fromPort": "output",
-      "toPort": "input"
-    },
-    {
-      "id": "c8",
-      "from": "ask-format-1",
-      "to": "detailed-1",
-      "fromPort": "output",
-      "toPort": "input"
-    },
-    {
-      "id": "c9",
-      "from": "ask-format-1",
-      "to": "bullets-1",
-      "fromPort": "output",
-      "toPort": "input"
-    },
-    {
-      "id": "c10",
-      "from": "ask-format-1",
-      "to": "keypoints-1",
-      "fromPort": "output",
-      "toPort": "input"
-    },
-    {
-      "id": "c11",
-      "from": "brief-1",
-      "to": "end-1",
-      "fromPort": "output",
-      "toPort": "input"
-    },
-    {
-      "id": "c12",
-      "from": "detailed-1",
-      "to": "end-1",
-      "fromPort": "output",
-      "toPort": "input"
-    },
-    {
-      "id": "c13",
-      "from": "bullets-1",
-      "to": "end-1",
-      "fromPort": "output",
-      "toPort": "input"
-    },
-    {
-      "id": "c14",
-      "from": "keypoints-1",
-      "to": "end-1",
-      "fromPort": "output",
-      "toPort": "input"
-    }
+    { "id": "c1", "from": "start-1", "to": "intake-1", "fromPort": "output", "toPort": "input" },
+    { "id": "c2", "from": "intake-1", "to": "researcher-1", "fromPort": "output", "toPort": "input" },
+    { "id": "c3", "from": "researcher-1", "to": "verifier-1", "fromPort": "output", "toPort": "input" },
+    { "id": "c4", "from": "verifier-1", "to": "detailed-1", "fromPort": "output", "toPort": "input" },
+    { "id": "c5", "from": "verifier-1", "to": "html-report-1", "fromPort": "output", "toPort": "input" },
+    { "id": "c6", "from": "verifier-1", "to": "keypoints-1", "fromPort": "output", "toPort": "input" },
+    { "id": "c7", "from": "verifier-1", "to": "brief-1", "fromPort": "output", "toPort": "input" },
+    { "id": "c8", "from": "detailed-1", "to": "end-1", "fromPort": "output", "toPort": "input" },
+    { "id": "c9", "from": "html-report-1", "to": "end-1", "fromPort": "output", "toPort": "input" },
+    { "id": "c10", "from": "keypoints-1", "to": "end-1", "fromPort": "output", "toPort": "input" },
+    { "id": "c11", "from": "brief-1", "to": "end-1", "fromPort": "output", "toPort": "input" }
   ],
   "createdAt": "2026-02-26T13:18:37.366Z",
-  "updatedAt": "2026-02-26T13:18:37.366Z",
+  "updatedAt": "2026-03-17T20:00:00.000Z",
   "subAgentFlows": []
 }
