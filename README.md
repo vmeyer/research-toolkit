@@ -1,178 +1,138 @@
-# Research Template
+# research-toolkit
 
-A multi-agent research and summarization workflow built with **[Claude Code Workflow Studio](https://marketplace.visualstudio.com/items?itemName=breaking-brake.cc-wf-studio)** (v3.26.0) -- a free, open-source VS Code extension for visual AI agent orchestration.
+A Claude Code plugin for structured, multi-agent web research with parallel execution, source verification, and formatted output generation.
 
-> **Extension**: [CC Workflow Studio on VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=breaking-brake.cc-wf-studio)
-> **Source**: [github.com/breaking-brake/cc-wf-studio](https://github.com/breaking-brake/cc-wf-studio)
-> **License**: AGPL-3.0
+## Installation
 
----
+**As a plugin (recommended):**
+```bash
+claude --plugin-dir /path/to/research-toolkit
+```
 
-## What is Claude Code Workflow Studio?
+**Or clone and use directly:**
+```bash
+git clone https://github.com/vmeyer/research_template.git
+cd research_template
+claude
+```
 
-CC Workflow Studio is a **visual drag-and-drop editor** for designing multi-agent AI workflows. Instead of writing agent orchestration code by hand, you design workflows on a canvas and export them as ready-to-run slash commands, agent skills, and prompt files.
+Then run `/research-toolkit:research-and-summarize` (plugin) or `/research-and-summarize` (standalone).
 
-### Key capabilities
+## What it does
 
-- **Visual workflow editor** -- drag-and-drop canvas for connecting agents, decision nodes, and tools
-- **Edit with AI** -- iteratively refine workflows through natural language conversation
-- **One-click export** -- generates `.claude/commands/`, `.claude/agents/`, `.agent/skills/`, `.gemini/skills/`, and `.github/prompts/` automatically
-- **MCP integration** -- built-in MCP server (`get_workflow_schema`, `get_current_workflow`, `apply_workflow`) for programmatic workflow editing
-- **Multi-agent support** -- works with Claude Code, GitHub Copilot, Gemini CLI, OpenAI Codex CLI, Roo Code, Cursor, and more
+You give it a topic. It clarifies what you need, splits the research into parallel tracks, searches the web with a triangulation strategy, verifies and synthesizes the results, and produces formatted reports — all autonomously after the initial intake.
 
-### How to use it
-
-1. Install the extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=breaking-brake.cc-wf-studio)
-2. Open the editor: click the icon in the editor's top-right corner, or `Cmd+Shift+P` > "CC Workflow Studio: Open Editor"
-3. Design your workflow on the canvas -- add sub-agent nodes, decision nodes, connect them
-4. Export to your target platform(s) with one click
-5. Run the generated slash command (e.g., `/research-and-summarize`) directly in Claude Code
-
----
-
-## This Template: Research & Summarize Workflow
-
-This repository is a **ready-to-use research template** exported from CC Workflow Studio. It implements a 5-stage multi-agent pipeline for structured research.
-
-### Workflow architecture
+### Pipeline
 
 ```
-START -> INTAKE -> RESEARCHER -> ANALYZER -> VERIFY? -> FORMAT SELECT -> OUTPUT -> END
+Intake (opus) → N × Researcher (sonnet, parallel) → Verifier (opus) → Formatter(s) (parallel)
 ```
 
 ```mermaid
 flowchart TD
-    start([Start])
-    intake[Intake Agent]
-    researcher[Researcher Agent]
-    analyzer[Analyzer Agent]
-    ask_verify{Verify research?}
-    verifier[Verifier Agent]
-    ask_format{Output format?}
-    brief[Brief Summary]
-    detailed[Detailed Report]
-    bullets[Bullet Points]
-    keypoints[Key Points]
-    finish([End])
-
-    start --> intake
-    intake --> researcher
-    researcher --> analyzer
-    analyzer --> ask_verify
-    ask_verify -->|Yes| verifier
-    ask_verify -->|Skip| ask_format
-    verifier --> ask_format
-    ask_format --> brief
-    ask_format --> detailed
-    ask_format --> bullets
-    ask_format --> keypoints
-    brief --> finish
-    detailed --> finish
-    bullets --> finish
-    keypoints --> finish
+    intake[Intake Agent] -->|N Sub-Briefs| researchers[N × Researcher]
+    researchers -->|Research Handoffs| verifier[Verifier]
+    verifier -->|Verified Analysis| formatters[Selected Formatters]
 ```
 
-### The agents
+**Single interaction point.** The intake agent asks clarifying questions one at a time (max 5). After that, the entire pipeline runs without interruption.
 
-| Stage | Agent | Model | Role |
-|-------|-------|-------|------|
-| 1. Intake | `intake-1` | Sonnet | Clarifies the research topic, asks follow-ups, produces a structured Research Brief |
-| 2. Research | `researcher-1` | Sonnet | Searches the web, reads sources, produces a structured Research Handoff |
-| 3. Analysis | `analyzer-1` | Sonnet | Cross-references sources, identifies 3-5 themes, assesses quality |
-| 4. Verification | `verifier-1` | Opus | (Optional) Reviews quality, fills gaps with additional research, scores 1-10 |
-| 5. Output | `brief-1` / `detailed-1` / `bullets-1` / `keypoints-1` | Sonnet/Opus | Writes the chosen format(s) and saves to `./research/<topic-slug>/` |
+### Agents
 
-### Structured handoff protocol
+| Agent | Model | Role |
+|-------|-------|------|
+| intake-1 | opus | Clarifies topic iteratively, determines depth/formats/language, splits into 2-4 sub-briefs |
+| researcher-1 (×N) | sonnet | Executes one sub-brief each using triangulation search strategy |
+| verifier-1 | opus | Merges results, synthesizes themes, verifies quality, fills gaps |
+| detailed-1 | sonnet | Comprehensive Markdown report |
+| html-report-1 | opus | Styled HTML report from template |
+| keypoints-1 | sonnet | Structured key points for skill creation |
+| brief-1 | sonnet | Executive summary (2-3 paragraphs) |
 
-Agents communicate through typed handoff documents, not free-form text:
+### Research strategy: Triangulation
 
-- **Research Brief** (Intake -> Researcher): Topic, question, scope, time focus, priorities
-- **Research Handoff** (Researcher -> Analyzer): Sources, facts, perspectives, data, gaps
-- **Analysis Handoff** (Analyzer -> Formatters): Quality assessment, themes, takeaways, unknowns
-- **Verified Analysis Handoff** (Verifier -> Formatters): Enhanced analysis with quality scores
+Three depth levels, configurable during intake:
+
+- **quick** — 2 query variations, ~5 sources, fast overview
+- **standard** (default) — 3-4 query variations, 8-12 sources, 3+ source types, counter-argument search, citation chain following
+- **deep** — All of standard plus academic sources, expert tracking, 15+ sources
+
+Every key claim is backed by at least 2 independent sources. Full source traceability from researcher through verifier to final output.
 
 ### Output
 
-Research results are saved to auto-versioned markdown files with YAML frontmatter:
+Reports are saved to `./research/<topic-slug>/` with auto-versioning:
 
 ```
-./research/
-  <topic-slug>/
-    brief-summary.md        # 2-3 paragraph executive summary
-    detailed-report.md       # Multi-section report with citations
-    bullet-points.md         # Organized bullet points by theme
-    key-points.md            # Structured extraction for skill creation
+./research/webassembly-enterprise-adoption/
+  detailed-report-v1.md     # Full report with citations
+  report-v1.html            # Styled HTML (from template)
+  key-points-v1.md          # Structured for skill creation
+  brief-summary-v1.md       # Executive summary
 ```
 
----
+All files include YAML frontmatter with topic, date, version, language, sources count, and completeness score.
 
-## Running the workflow
+## Dashboard
 
-### Option 1: Claude Code slash command
-
-```
-/research-and-summarize
-```
-
-Then provide your research topic when prompted.
-
-### Option 2: Edit workflows with AI (requires VS Code)
-
-With the CC Workflow Studio extension active in VS Code:
+After running multiple research sessions, generate an overview page:
 
 ```
-/cc-workflow-ai-editor
+/research-toolkit:research-dashboard
 ```
 
-This connects to the extension's MCP server to interactively create or modify workflows through conversation.
+This reads all HTML reports from `./research/` and creates a static `index.html` with links, scores, and summary excerpts.
 
-### MCP configuration
+## Skills
 
-The project includes an MCP config (`.mcp.json`) that connects to the CC Workflow Studio extension:
-
-```json
-{
-  "mcpServers": {
-    "cc-workflow-studio": {
-      "type": "http",
-      "url": "http://127.0.0.1:64247/mcp"
-    }
-  }
-}
-```
-
-The MCP server exposes three tools:
-- `get_workflow_schema` -- returns the JSON schema for workflow files
-- `get_current_workflow` -- returns the workflow currently open in the visual editor
-- `apply_workflow` -- pushes a workflow JSON to the visual editor canvas
-
-> **Note**: The MCP server is only available when the CC Workflow Studio extension is running in VS Code.
-
----
+| Skill | Description |
+|-------|-------------|
+| `research-and-summarize` | Full research pipeline |
+| `research-dashboard` | Aggregate HTML reports into dashboard |
+| `cc-workflow-ai-editor` | Edit workflows via CC Workflow Studio MCP |
 
 ## Project structure
 
 ```
-.claude/
-  agents/           # 8 agent definitions (intake, researcher, analyzer, verifier, 4 formatters)
-  commands/          # Slash commands (research-and-summarize, cc-workflow-ai-editor)
-  settings.local.json
-.agent/skills/       # Skills for Claude Code
-.gemini/skills/      # Skills for Gemini CLI
-.github/prompts/     # Prompts for GitHub Copilot
-.vscode/workflows/   # Source workflow JSON (editable in CC Workflow Studio)
-.mcp.json            # MCP server configuration
+research-toolkit/
+├── .claude-plugin/
+│   └── plugin.json              # Plugin manifest
+├── agents/                      # Agent definitions (plugin)
+│   ├── intake-1.md
+│   ├── researcher-1.md
+│   ├── verifier-1.md
+│   ├── detailed-1.md
+│   ├── html-report-1.md
+│   ├── keypoints-1.md
+│   └── brief-1.md
+├── skills/                      # Skills (plugin)
+│   ├── research-and-summarize/
+│   ├── research-dashboard/
+│   └── cc-workflow-ai-editor/
+├── commands/                    # Slash commands (plugin)
+├── templates/
+│   └── report.html              # HTML report template
+├── .claude/                     # Standalone config (for direct use)
+│   ├── agents/
+│   └── commands/
+├── .gemini/skills/              # Gemini CLI support
+├── .github/prompts/             # GitHub Copilot support
+└── .vscode/workflows/           # CC Workflow Studio source
 ```
-
----
 
 ## Cross-platform support
 
-This template is exported for multiple AI coding platforms simultaneously:
+| Platform | How to use |
+|----------|------------|
+| Claude Code (plugin) | `claude --plugin-dir .` → `/research-toolkit:research-and-summarize` |
+| Claude Code (standalone) | Clone repo → `/research-and-summarize` |
+| Gemini CLI | Clone repo, skills auto-detected |
+| GitHub Copilot | Clone repo, prompts auto-detected |
 
-| Platform | Location | How to run |
-|----------|----------|------------|
-| Claude Code | `.claude/commands/` + `.claude/agents/` | `/research-and-summarize` |
-| Claude Code Skills | `.agent/skills/` | Auto-detected |
-| Gemini CLI | `.gemini/skills/` | Auto-detected |
-| GitHub Copilot | `.github/prompts/` | Via Copilot Chat |
+## CC Workflow Studio
+
+The workflow was originally designed with [CC Workflow Studio](https://marketplace.visualstudio.com/items?itemName=breaking-brake.cc-wf-studio), a visual drag-and-drop editor for multi-agent workflows. The source workflow JSON is in `.vscode/workflows/`. To edit it visually, install the VS Code extension and run `/research-toolkit:cc-workflow-ai-editor`.
+
+## License
+
+MIT
