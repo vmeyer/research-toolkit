@@ -11,7 +11,7 @@ claude --plugin-dir /path/to/research-toolkit
 
 **Or clone and use directly:**
 ```bash
-git clone https://github.com/vmeyer/research_template.git
+git clone https://github.com/vmeyer/research-toolkit.git
 cd research_template
 claude
 ```
