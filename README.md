@@ -28,12 +28,7 @@ You give it a topic. It clarifies what you need, splits the research into parall
 Intake (opus) → N × Researcher (sonnet, parallel) → Verifier (opus) → Formatter(s) (parallel)
 ```
 
-```mermaid
-flowchart TD
-    intake[Intake Agent] -->|N Sub-Briefs| researchers[N × Researcher]
-    researchers -->|Research Handoffs| verifier[Verifier]
-    verifier -->|Verified Analysis| formatters[Selected Formatters]
-```
+![Research Pipeline](diagrams/research-pipeline/excalidraw/research-pipeline.png)
 
 **Single interaction point.** The intake agent asks clarifying questions one at a time (max 5). After that, the entire pipeline runs without interruption.
 
@@ -89,7 +84,6 @@ This reads all HTML reports from `./research/` and creates a static `index.html`
 |-------|-------------|
 | `research-and-summarize` | Full research pipeline |
 | `research-dashboard` | Aggregate HTML reports into dashboard |
-| `cc-workflow-ai-editor` | Edit workflows via CC Workflow Studio MCP |
 
 ## Project structure
 
@@ -107,8 +101,7 @@ research-toolkit/
 │   └── brief-1.md
 ├── skills/                      # Skills (plugin)
 │   ├── research-and-summarize/
-│   ├── research-dashboard/
-│   └── cc-workflow-ai-editor/
+│   └── research-dashboard/
 ├── commands/                    # Slash commands (plugin)
 ├── templates/
 │   └── report.html              # HTML report template
@@ -116,8 +109,7 @@ research-toolkit/
 │   ├── agents/
 │   └── commands/
 ├── .gemini/skills/              # Gemini CLI support
-├── .github/prompts/             # GitHub Copilot support
-└── .vscode/workflows/           # CC Workflow Studio source
+└── .github/prompts/             # GitHub Copilot support
 ```
 
 ## Cross-platform support
@@ -128,10 +120,6 @@ research-toolkit/
 | Claude Code (standalone) | Clone repo → `/research-and-summarize` |
 | Gemini CLI | Clone repo, skills auto-detected |
 | GitHub Copilot | Clone repo, prompts auto-detected |
-
-## CC Workflow Studio
-
-The workflow was originally designed with [CC Workflow Studio](https://marketplace.visualstudio.com/items?itemName=breaking-brake.cc-wf-studio), a visual drag-and-drop editor for multi-agent workflows. The source workflow JSON is in `.vscode/workflows/`. To edit it visually, install the VS Code extension and run `/research-toolkit:cc-workflow-ai-editor`.
 
 ## License
 
