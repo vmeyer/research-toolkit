@@ -1,6 +1,6 @@
 ---
 name: research-and-summarize
-description: Execute the "research-and-summarize" workflow. A multi-agent research pipeline that clarifies a topic, researches it in parallel with triangulation strategy, verifies and synthesizes findings, and produces formatted outputs. Use this skill whenever the user wants to research a topic, investigate a question, or produce a research report.
+description: Execute the "research-and-summarize" workflow. A multi-agent, evidence-grade research pipeline governed by two dials — `depth` (breadth of search) and `assurance` (standard vs. high, adding a blocking evidence gate, rework loop, and final critic). Clarifies a topic, researches it in parallel with triangulation, normalizes findings into a machine-readable evidence contract (claims + sources sidecars), persists every run to disk so it is resumable, and produces formatted outputs. Use this skill whenever the user wants to research a topic, investigate a question, or produce a research report.
 ---
 
 # research-and-summarize
@@ -27,6 +27,18 @@ flowchart TD
 
 This pipeline runs **autonomously after the intake step**. There are no mid-flow user questions. The intake agent handles all user interaction upfront.
 
+### Step 0: Resume Check (v3)
+
+Before intake, check `research/runs/` for a `running` run matching the requested
+slug. If found: read its `state.yaml`, re-validate referenced files
+(`python -m contract.validate_contract <run-dir>`), and resume at the first step
+not marked `done`. Do not re-run completed sub-researchers. Never touch
+`blocked`/`completed` runs.
+
+All steps below read/write files under `research/runs/<run-id>/`. Handoffs are
+files, never chat-only. Update `state.yaml` atomically (temp file + rename) after
+each step reaches `done`. Dispatch mechanics per `references/adapter-claude-code.md`.
+
 ### Step 1: Run Intake Agent
 
 Dispatch `intake-1` sub-agent with the user's research request. This agent:
@@ -47,17 +59,46 @@ Each researcher receives:
 - Their specific Sub-Brief (focus, search angles, expected source types)
 - The research depth from Configuration
 - The overall Research Question for context
+- Their exclusive output folder `researchers/sub-NN/` (v3): each researcher writes
+  `findings.md`, `claims.jsonl`, and `sources.jsonl` there, reading
+  `contract/contract.md` for the schema. Handoffs are files, not chat-only.
 
-Wait for all researchers to complete. Collect all Research Handoffs.
+Wait for all researchers to complete. Do not reconstruct missing output from an
+agent's chat reply — verify the sidecar files exist and parse.
 
 ### Step 3: Run Verifier
 
 Dispatch `verifier-1` sub-agent with:
 - The original RESEARCH BRIEF (for alignment checking)
-- All Research Handoffs from the parallel researchers
-- The Configuration block
+- The path to the `researchers/sub-*/` folders (it reads their `claims.jsonl` and
+  `sources.jsonl` from disk)
+- The Configuration block (including `assurance`)
 
-The verifier synthesizes, analyzes, and verifies. Wait for it to complete.
+The verifier synthesizes, normalizes to global IDs, deduplicates sources, and
+writes `verified/{analysis.md, claims.jsonl, sources.jsonl}` (plus
+`verified/issues.yaml` when `assurance: high`). Wait for it to complete.
+
+### Step 3b: Validate evidence
+
+Run `python -m contract.validate_contract verified/`. On any error at
+`assurance: high`, treat as a gate finding (Step 3c). At `assurance: standard`,
+surface as a warning but continue.
+
+### Step 3c: Evidence Gate (assurance: high only)
+
+Read `verified/issues.yaml` and the validator output. Determine status:
+- `PASS` — no unresolved blocker/high findings.
+- `PASS_WITH_GAPS` — only documented medium/low gaps.
+- `REWORK` — ≥1 fixable blocker/high finding and `rework_used < 2`.
+- `BLOCKED` — critical source missing, or `rework_used == 2` with open blockers.
+
+On `REWORK`: dispatch **one** targeted `researcher-1` scoped to the affected
+claim IDs + the specific finding as read-only input. Re-run the verifier
+normalization for the affected claims, re-validate, increment `rework_used`,
+re-enter the gate. On `BLOCKED`: set `state.status: blocked` with a documented
+cause and stop. On `PASS`/`PASS_WITH_GAPS`: dispatch `final-critic-1`, resolve its
+findings yourself, then call the `verification-before-completion` skill before
+formatting outputs.
 
 ### Step 4: Run Selected Formatters
 
@@ -69,6 +110,7 @@ Read `output_formats` from the Configuration. For each selected format, spawn th
 | `html` | `html-report-1` |
 | `keypoints` | `keypoints-1` |
 | `brief` | `brief-1` |
+| `decision` | `decision-1` |
 
 Each formatter receives the complete Verified Analysis Handoff.
 
@@ -82,7 +124,7 @@ Wait for all formatters to complete. Report the output file paths to the user.
 
 **Model**: opus
 
-**Tools**: AskUserQuestion
+**Tools**: AskUserQuestion, Write
 
 #### researcher_1..N (Sub-Agent: researcher-1, parallel instances)
 
@@ -90,7 +132,7 @@ Wait for all formatters to complete. Report the output file paths to the user.
 
 **Model**: sonnet
 
-**Tools**: WebSearch, WebFetch, Read
+**Tools**: WebSearch, WebFetch, Read, Write
 
 #### verifier_1 (Sub-Agent: verifier-1)
 
@@ -98,7 +140,7 @@ Wait for all formatters to complete. Report the output file paths to the user.
 
 **Model**: opus
 
-**Tools**: WebSearch, WebFetch, Read
+**Tools**: WebSearch, WebFetch, Read, Write
 
 #### detailed_1 (Sub-Agent: detailed-1)
 
@@ -131,3 +173,19 @@ Wait for all formatters to complete. Report the output file paths to the user.
 **Model**: sonnet
 
 **Tools**: Bash, Write, Glob, Read
+
+#### final_critic_1 (Sub-Agent: final-critic-1, assurance: high only)
+
+**Description**: Read-only final critic that checks the synthesized draft against the evidence contract, claims, and sources without editing anything
+
+**Model**: opus
+
+**Tools**: Read, Write
+
+#### decision_1 (Sub-Agent: decision-1)
+
+**Description**: Produce a decision document (ADR style) from verified research
+
+**Model**: opus
+
+**Tools**: Read, Write, Bash, Glob
