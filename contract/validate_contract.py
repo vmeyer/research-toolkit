@@ -68,3 +68,76 @@ def validate_sources(sources: list[dict]) -> list[str]:
         if not (has_url or has_code):
             errs.append(f"source {sid}: missing anchor (need url OR repo+path)")
     return errs
+
+
+import os
+from urllib.parse import urlparse
+
+
+def _domain(url: str | None) -> str | None:
+    if not url:
+        return None
+    host = urlparse(url).netloc.lower()
+    parts = host.split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else host
+
+
+def validate_cross_refs(claims: list[dict], sources: list[dict]) -> list[str]:
+    errs: list[str] = []
+    src_ids = {s.get("source_id") for s in sources}
+    claim_ids = {c.get("claim_id") for c in claims}
+    for c in claims:
+        cid = c.get("claim_id")
+        for sref in c.get("source_ids", []):
+            if sref not in src_ids:
+                errs.append(f"claim {cid}: unresolvable source_id '{sref}'")
+        for pref in c.get("parent_claim_ids", []):
+            if pref not in claim_ids:
+                errs.append(f"claim {cid}: unresolvable parent_claim_id '{pref}'")
+    return errs
+
+
+def validate_decision_rules(claims: list[dict], sources: list[dict]) -> list[str]:
+    errs: list[str] = []
+    by_id = {s.get("source_id"): s for s in sources}
+    for c in claims:
+        if not (c.get("decision_relevant") and c.get("claim_kind") == "recommendation"):
+            continue
+        refs = c.get("source_ids", [])
+        keys = set()
+        for sref in refs:
+            s = by_id.get(sref, {})
+            keys.add(_domain(s.get("url")) or s.get("publisher") or s.get("repo") or sref)
+        if len(keys) < 2:
+            errs.append(
+                f"claim {c.get('claim_id')}: decision-relevant recommendation "
+                f"needs >=2 independent sources (distinct publisher/domain)"
+            )
+    return errs
+
+
+def validate_run(run_dir: str) -> list[str]:
+    errs: list[str] = []
+    cpath = os.path.join(run_dir, "claims.jsonl")
+    spath = os.path.join(run_dir, "sources.jsonl")
+    for p in (cpath, spath):
+        if not os.path.exists(p):
+            errs.append(f"missing required file: {p}")
+    if errs:
+        return errs
+    claims = load_jsonl(cpath)
+    sources = load_jsonl(spath)
+    errs += validate_claims(claims)
+    errs += validate_sources(sources)
+    errs += validate_cross_refs(claims, sources)
+    errs += validate_decision_rules(claims, sources)
+    return errs
+
+
+if __name__ == "__main__":
+    import sys
+    problems = validate_run(sys.argv[1])
+    if problems:
+        print("\n".join(problems))
+        sys.exit(1)
+    print("OK")

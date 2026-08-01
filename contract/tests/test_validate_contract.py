@@ -51,3 +51,32 @@ def test_source_missing_anchor_fails():
 def test_source_code_anchor_passes():
     s = _source(url=None, repo="r", path="p/f.py", line_start=1, line_end=9)
     assert validate_sources([s]) == []
+
+from contract.validate_contract import validate_cross_refs, validate_decision_rules
+
+def test_unresolvable_source_ref_fails():
+    claims = [_claim(source_ids=["S999"])]
+    sources = [_source()]
+    errs = validate_cross_refs(claims, sources)
+    assert any("S999" in e for e in errs)
+
+def test_unresolvable_parent_ref_fails():
+    claims = [_claim(claim_id="C002", claim_kind="inference",
+                     parent_claim_ids=["C999"], source_ids=[])]
+    errs = validate_cross_refs(claims, [_source()])
+    assert any("C999" in e for e in errs)
+
+def test_decision_recommendation_same_domain_fails():
+    claims = [_claim(claim_kind="recommendation", decision_relevant=True,
+                     source_ids=["S001", "S002"])]
+    sources = [_source(source_id="S001", url="https://a.example/x"),
+               _source(source_id="S002", url="https://a.example/y")]
+    errs = validate_decision_rules(claims, sources)
+    assert any("independent" in e.lower() for e in errs)
+
+def test_decision_recommendation_two_domains_passes():
+    claims = [_claim(claim_kind="recommendation", decision_relevant=True,
+                     source_ids=["S001", "S002"])]
+    sources = [_source(source_id="S001", url="https://a.example/x"),
+               _source(source_id="S002", url="https://b.example/y")]
+    assert validate_decision_rules(claims, sources) == []
