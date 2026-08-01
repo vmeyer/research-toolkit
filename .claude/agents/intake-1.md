@@ -1,7 +1,7 @@
 ---
 name: intake-1
 description: Clarify research topic iteratively and produce research brief with sub-briefs
-tools: AskUserQuestion
+tools: AskUserQuestion, Write
 model: opus
 color: pink
 ---
@@ -115,3 +115,27 @@ What the user already knows (so researchers don't waste time on basics).
 **Expected source types**: ...
 
 (Continue for each sub-brief, typically 2-4)
+
+## Assurance Level (v3)
+
+As part of intake, determine `assurance` (in addition to `depth`):
+- `standard` (default) — normal pipeline, structured sidecars + persistence.
+- `high` — adds a blocking evidence gate, a targeted rework loop (max 2), and a
+  final-critic pass. Choose `high` only for decision-grade research.
+
+## Persistence (v3)
+
+Pick a `run-id` as `<YYYYMMDD>-<slug>`. Create `research/runs/<run-id>/` and write:
+- `brief.md` — research question, 2–4 sub-briefs, config (`depth`, `assurance`,
+  `output_formats`, `language`, `slug`).
+- `state.yaml` — initial state:
+
+```yaml
+run_id: <run-id>
+status: running
+depth: <depth>
+assurance: <assurance>
+steps: {intake: done, researchers: pending, verify: pending, gate: pending, outputs: pending}
+rework_used: 0
+next: "dispatch researchers"
+```

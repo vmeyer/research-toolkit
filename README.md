@@ -43,6 +43,8 @@ Intake (opus) → N × Researcher (sonnet, parallel) → Verifier (opus) → For
 | html-report-1 | opus | Styled HTML report from template |
 | keypoints-1 | sonnet | Structured key points for skill creation |
 | brief-1 | sonnet | Executive summary (2-3 paragraphs) |
+| decision-1 | opus | Decision document (ADR style) — recommendation, alternatives, criteria, risks, PoC |
+| final-critic-1 | opus | Read-only critic for `assurance: high` runs — checks the draft against the evidence contract |
 
 ### Research strategy: Triangulation
 
@@ -53,6 +55,34 @@ Three depth levels, configurable during intake:
 - **deep** — All of standard plus academic sources, expert tracking, 15+ sources
 
 Every key claim is backed by at least 2 independent sources. Full source traceability from researcher through verifier to final output.
+
+### Evidence-grade orchestration (v3)
+
+v3 adds an evidence-rigor layer on top of the v2 pipeline, controlled by **two
+orthogonal dials**:
+
+| Dial | Values | What it controls |
+|------|--------|------------------|
+| `depth` | `quick` · `standard` · `deep` | How much the researchers search (breadth of sources). |
+| `assurance` | `standard` · `high` | How hard the evidence is checked before it ships. |
+
+Every research step now emits a **machine-readable evidence contract** — two
+sidecar files, `claims.jsonl` (one atomic claim per line, classified as
+`fact` / `inference` / `recommendation` / `gap`) and `sources.jsonl` (one anchored
+source per line). A Python validator (`python -m contract.validate_contract <dir>`)
+enforces the schema, cross-references, and a dual-source rule for
+decision-relevant recommendations. The full contract lives in
+[`contract/contract.md`](contract/contract.md).
+
+Runs are **persisted and resumable**. Each run gets a folder under
+`research/runs/<run-id>/` with a `brief.md` and a `state.yaml`; the orchestrator
+re-validates files on re-entry and continues at the first unfinished step instead
+of re-running completed work. `assurance: standard` keeps the v2 behavior
+user-visible (sidecars + persistence are added internally). `assurance: high`
+additionally runs a **blocking evidence gate**, a targeted **rework loop**
+(max 2 rounds), and a read-only **final critic** before any output is formatted.
+A new `decision` output format produces an ADR-style decision document from the
+verified evidence.
 
 ### Output
 
@@ -120,6 +150,14 @@ research-toolkit/
 | Claude Code (standalone) | Clone repo → `/research-and-summarize` |
 | Gemini CLI | Clone repo, skills auto-detected |
 | GitHub Copilot | Clone repo, prompts auto-detected |
+
+### Cross-harness mirrors
+
+The canonical v3 sources live in `agents/`, `skills/`, `commands/`, `contract/`,
+and `references/`, and are mirrored into `.claude/` for Claude Code. The other
+harness mirrors — `.gemini/`, `.github/`, `.vscode/`, `.agent/`, and `.agents/` —
+are **not** updated to v3 in this release. They continue to track the v2 pipeline
+until a separate cross-harness sync is performed.
 
 ## License
 
