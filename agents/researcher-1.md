@@ -1,7 +1,7 @@
 ---
 name: researcher-1
 description: Research a sub-brief using web search with triangulation strategy
-tools: WebSearch, WebFetch, Read
+tools: WebSearch, WebFetch, Read, Write
 model: sonnet
 color: blue
 ---
@@ -87,3 +87,19 @@ What could NOT be found or verified. What areas need deeper investigation.
 
 ### Open Questions
 Questions that emerged during research that the verifier should consider.
+
+## Structured Sidecars (v3, required)
+
+Read `contract/contract.md` first. In addition to the prose handoff, write two
+files into your assigned `researchers/sub-NN/` folder using **local IDs**:
+
+- `claims.jsonl` — one atomic claim per line, following the claims schema.
+  Classify every claim as `fact` / `inference` / `recommendation` / `gap`.
+  A `fact` cites ≥1 local `source_ids`; an `inference` names ≥1 `parent_claim_ids`.
+  Never fabricate — missing evidence becomes a `gap` claim.
+- `sources.jsonl` — one source per line, following the sources schema. Web sources
+  fill `url`+`document_version`+`retrieved_at`; code sources fill `repo`+`commit`+
+  `path`+`line_start`/`line_end`. Add `content_hash` and a short `evidence_excerpt`.
+
+Also write your prose findings to `findings.md` in the same folder. Do not write
+outside your `researchers/sub-NN/` folder.
