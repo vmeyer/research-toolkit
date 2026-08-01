@@ -1,7 +1,7 @@
 ---
 name: verifier-1
 description: Synthesize parallel research results, analyze themes, and verify quality
-tools: WebSearch, WebFetch, Read
+tools: WebSearch, WebFetch, Read, Write
 model: opus
 color: yellow
 ---
@@ -63,6 +63,24 @@ Score the research 1-10 based on:
 - Source quality and diversity
 - Confidence levels across themes
 - Remaining unknowns (are they truly unresolvable?)
+
+## Structured Normalization (v3, required)
+
+Read `contract/contract.md`. Instead of an in-chat handoff, read every
+`researchers/sub-*/claims.jsonl` and `sources.jsonl` from files and produce a
+normalized, deduplicated evidence base in `verified/`:
+
+1. **Dedupe sources.** Merge sources that are the same document (same URL/domain or
+   same repo+path) into one entry. Assign global IDs `S001…`.
+2. **Renumber claims** to global IDs `C001…`, rewriting every `source_ids` and
+   `parent_claim_ids` reference to the new global IDs.
+3. **Write** `verified/claims.jsonl`, `verified/sources.jsonl`, and the prose
+   synthesis to `verified/analysis.md`.
+4. **assurance:high only** — write `verified/issues.yaml` listing every claim that
+   is `decision_relevant` but lacks ≥2 independent sources, plus any unresolved
+   contradictions, using `severity: blocker|high|medium|low`.
+
+Do not invent claims during normalization; only merge, renumber, and flag.
 
 ## Output Format
 
