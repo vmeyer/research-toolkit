@@ -29,24 +29,28 @@ You are running under **Copilot CLI** → use `references/adapter-copilot-cli.md
 (`platform: copilot-cli`) for dispatch and tool names.
 
 `researcher-1` and `verifier-1` need four canonical capabilities: `web_search`,
-`web_fetch`, `read`, `write`. Copilot CLI maps `read`→`view` and `write`→
-`create`/`edit`, but **ships no web tool** — `web_search`/`web_fetch` require a
-web-capable MCP server exposing `web`. Do **not** declare `WebSearch`/`WebFetch`;
-Copilot registers nothing for them.
+`web_fetch`, `read`, `write`. Copilot CLI provides all four **natively** under
+the names `web_search`, `web_fetch`, `view`, `create`/`edit`. Profiles must
+declare these Copilot names (the shared `agents/*.md` declare both Copilot and
+Claude names). Declaring only Claude names (`WebSearch`/`WebFetch`) is what
+caused the original failure — Copilot dropped the unrecognized names and left
+only `view`/`create`/`edit`.
 
 Run the preflight before any research:
 
 ```bash
-python -m contract.capabilities copilot-cli <registered_tool> ...
-# only view/create/edit registered  -> BLOCKED (web_search, web_fetch); exit 1
-# web + view/create/edit registered -> PASS; exit 0
+python -m contract.capabilities copilot-cli web_search web_fetch view create edit
+# -> PASS; exit 0
+python -m contract.capabilities copilot-cli view create edit
+# -> BLOCKED (web_search, web_fetch missing); exit 1  ← the original regression
 ```
 
 Then live-probe one `web_search`, one `web_fetch`, and a `write`+`read`
 round-trip. If any required capability is missing, **stop before writing any
 artifact** and report BLOCKED — no `curl`, parent-agent, other-agent, or
-fabricated-source fallback. `/allow-all` only widens URL access for an existing
-web tool; it cannot register a missing one. See `references/capability-model.md`.
+fabricated-source fallback. `/allow-all` only widens URL access for the existing
+web tools; it cannot register a tool the profile failed to request. See
+`references/capability-model.md`.
 
 ### Step 1: Intake
 Run intake-1 agent. It clarifies the topic iteratively (max 5 questions), determines research depth (quick/standard/deep), output formats, language, and splits into N Sub-Briefs.

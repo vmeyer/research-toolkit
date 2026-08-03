@@ -161,28 +161,31 @@ each harness adapter maps to native tool names. The mappings live in
 [`references/adapter-claude-code.md`](references/adapter-claude-code.md), and
 [`references/adapter-copilot-cli.md`](references/adapter-copilot-cli.md).
 
-| Capability | Claude Code | Copilot CLI |
-|------------|-------------|-------------|
-| `web_search` | `WebSearch` | `web` *(via MCP — not native)* |
-| `web_fetch`  | `WebFetch`  | `web` *(via MCP — not native)* |
+| Capability | Claude Code | Copilot CLI (native) |
+|------------|-------------|----------------------|
+| `web_search` | `WebSearch` | `web_search` |
+| `web_fetch`  | `WebFetch`  | `web_fetch` |
 | `read`       | `Read`      | `view` |
 | `write`      | `Write`     | `create` / `edit` |
 
-Before any research runs, the orchestrator executes a **capability preflight**
+Both harnesses provide web search and web fetch **natively** — Copilot's names
+are verified against its bundled SDK alias table. Before any research runs, the
+orchestrator executes a **capability preflight**
 (`python -m contract.capabilities <platform> <registered_tool> ...`). If a
-required capability is not registered, the run is **BLOCKED before any artifact
-is written** — no `curl`, parent-agent, other-agent, or fabricated-source
-fallback.
+required capability is not registered for the agent, the run is **BLOCKED before
+any artifact is written** — no `curl`, parent-agent, other-agent, or
+fabricated-source fallback.
 
-> **Copilot CLI needs a web tool.** Copilot CLI ships file tools
-> (`view`/`create`/`edit`) but **no web tool**. `web_search`/`web_fetch` must be
-> supplied by a web-capable MCP server exposing a `web` tool. Without it the
-> researcher/verifier see only `view`/`create`/`edit` and the preflight reports
-> BLOCKED — as designed.
+> **Declare the harness's own tool names.** The original failure was a profile
+> declaring Claude names (`WebSearch, WebFetch`) that Copilot's custom-agent
+> loader did not recognize — it dropped them and fell back to only
+> `view`/`create`/`edit`. The shared `agents/*.md` profiles now declare **both**
+> name sets, so a single file works on both harnesses (each ignores the names it
+> doesn't know). No MCP server is required for research.
 >
 > **URL permissions are not capabilities.** `--allow-all-urls` / `/allow-all`
 > only widen which URLs an *existing* web tool may reach. They cannot register a
-> missing tool and never clear a BLOCKED web preflight.
+> tool the profile failed to request and never clear a BLOCKED web preflight.
 
 ### Cross-harness mirrors
 

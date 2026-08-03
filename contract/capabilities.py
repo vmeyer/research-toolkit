@@ -42,13 +42,15 @@ ADAPTERS: dict[str, dict[str, list[str]]] = {
         WRITE: ["Write"],
     },
     "copilot-cli": {
-        # Copilot CLI ships no web tool; a web-capable MCP server must expose
-        # one of these before research may start. See adapter-copilot-cli.md.
-        WEB_SEARCH: ["web", "web_search", "websearch"],
-        WEB_FETCH: ["web", "web_fetch", "webfetch", "fetch"],
-        # Copilot's native file tools are view/create/edit.
-        READ: ["read", "view"],
-        WRITE: ["edit", "create", "write"],
+        # Copilot CLI ships native web tools; the canonical names are
+        # web_search / web_fetch (verified against the bundled SDK alias table:
+        # web_fetch->WebFetch, web_search->WebSearch, view->Read, create->Write,
+        # edit->Edit). The Claude names are accepted aliases; `web` is only an
+        # optional name an MCP server might use. See adapter-copilot-cli.md.
+        WEB_SEARCH: ["web_search", "WebSearch", "web"],
+        WEB_FETCH: ["web_fetch", "WebFetch", "fetch", "web"],
+        READ: ["view", "Read", "read"],
+        WRITE: ["create", "edit", "Write", "Edit", "write"],
     },
 }
 
@@ -123,11 +125,14 @@ def preflight(
         reason = (
             f"{platform}: BLOCKED — no registered tool for "
             + ", ".join(missing)
-            + ". URL permissions (--allow-all-urls / /allow-all) only unlock "
-            "tools that already exist; they cannot register a missing tool. "
-            "Register a web-capable tool (e.g. an MCP server exposing `web`) or "
-            "run on a platform that provides it. Fallbacks via curl, the parent "
-            "agent, another research agent, or fabricated sources are forbidden."
+            + ". Both harnesses provide web tools natively (Claude Code: "
+            "WebSearch/WebFetch; Copilot CLI: web_search/web_fetch), so this "
+            "usually means the agent profile declared tool names the harness did "
+            "not recognize — declare the harness's own names. URL permissions "
+            "(--allow-all-urls / /allow-all) only unlock tools that already "
+            "exist; they cannot register a missing tool. Fallbacks via curl, the "
+            "parent agent, another research agent, or fabricated sources are "
+            "forbidden."
         )
         return PreflightResult(platform, "BLOCKED", resolved, missing, reason)
 

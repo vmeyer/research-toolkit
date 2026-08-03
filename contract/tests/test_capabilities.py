@@ -26,8 +26,11 @@ from contract.validate_contract import validate_run
 
 # Tools each harness registers when everything is wired up correctly.
 CLAUDE_CODE_TOOLS = ["WebSearch", "WebFetch", "Read", "Write"]
-COPILOT_WITH_WEB = ["web", "view", "create", "edit"]
-# The reported bug: Copilot exposes only its native file tools, no web tools.
+# Copilot's native tool names (verified from the bundled SDK): web_search /
+# web_fetch are native, file tools are view / create / edit.
+COPILOT_WITH_WEB = ["web_search", "web_fetch", "view", "create", "edit"]
+# The reported bug: the profile declared Claude tool names, Copilot dropped the
+# unrecognized web names and fell back to only its default file tools.
 COPILOT_REGRESSION = ["view", "create", "edit"]
 
 
@@ -92,6 +95,22 @@ def test_blocked_reason_is_reproducible():
 
 
 # --- URL permissions cannot rescue a missing web tool ---------------------
+
+def test_copilot_native_web_tools_pass():
+    # web_search / web_fetch are Copilot's native canonical names.
+    res = preflight("copilot-cli", COPILOT_WITH_WEB)
+    assert res.status == "PASS"
+    assert res.resolved[WEB_SEARCH] == "web_search"
+    assert res.resolved[WEB_FETCH] == "web_fetch"
+    assert res.resolved["read"] == "view"
+    assert res.resolved["write"] == "create"
+
+
+def test_copilot_accepts_claude_name_aliases():
+    # A profile that declares Claude names still resolves via the alias map.
+    res = preflight("copilot-cli", ["WebSearch", "WebFetch", "Read", "Write"])
+    assert res.status == "PASS"
+
 
 def test_url_permission_does_not_create_web_tool():
     # /allow-all only widens URL access for tools that exist; it registers no

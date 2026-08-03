@@ -58,9 +58,10 @@ Then run the **capability preflight** described in
 2. Live probe: actually run one `web_search`, one `web_fetch`, and a
    `write`+`read` round-trip; record `preflight/capability-probe.json`.
 
-If any required capability is missing (e.g. Copilot CLI exposes only
-`view`/`create`/`edit` with no web tool), set `state.status: blocked` with the
-documented cause and **stop before any research artifact is created** — the
+If any required capability is missing (e.g. the profile declared tool names the
+harness did not recognize, so Copilot CLI registered only `view`/`create`/`edit`
+and dropped the web tools), set `state.status: blocked` with the documented cause
+and **stop before any research artifact is created** — the
 `researchers/sub-*/` and `verified/` folders stay empty. Never work around a
 missing tool via `curl`, the parent agent, another research agent, or fabricated
 sources. URL permissions (`--allow-all-urls` / `/allow-all`) do not create
@@ -159,7 +160,7 @@ Wait for all formatters to complete. Report the output file paths to the user.
 
 **Model**: sonnet
 
-**Tools**: WebSearch, WebFetch, Read, Write
+**Tools**: WebSearch, WebFetch, Read, Write (Claude Code) · web_search, web_fetch, view, create, edit (Copilot CLI)
 
 #### verifier_1 (Sub-Agent: verifier-1)
 
@@ -167,7 +168,7 @@ Wait for all formatters to complete. Report the output file paths to the user.
 
 **Model**: opus
 
-**Tools**: WebSearch, WebFetch, Read, Write
+**Tools**: WebSearch, WebFetch, Read, Write (Claude Code) · web_search, web_fetch, view, create, edit (Copilot CLI)
 
 #### detailed_1 (Sub-Agent: detailed-1)
 

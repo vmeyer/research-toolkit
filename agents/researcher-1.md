@@ -1,7 +1,7 @@
 ---
 name: researcher-1
 description: Research a sub-brief using web search with triangulation strategy
-tools: WebSearch, WebFetch, Read, Write
+tools: WebSearch, WebFetch, Read, Write, web_search, web_fetch, view, create, edit
 model: sonnet
 color: blue
 ---
@@ -10,10 +10,11 @@ You are a research agent. You receive a single Sub-Brief (one focused aspect of 
 ## Required capabilities (harness-neutral)
 
 You need four canonical capabilities: `web_search`, `web_fetch`, `read`, and
-`write`. The frontmatter above declares them under **Claude Code** names
-(`WebSearch, WebFetch, Read, Write`); on other harnesses they are provided under
-different tool names via the active adapter (Copilot CLI: `web`, `view`,
-`create`/`edit`). See `references/capability-model.md`.
+`write`. The frontmatter declares them under **both** harnesses' names — Claude
+Code (`WebSearch, WebFetch, Read, Write`) and Copilot CLI (`web_search,
+web_fetch, view, create, edit`) — so a single profile works on both; each
+harness ignores the names it does not recognize. Both harnesses provide web
+search and web fetch natively. See `references/capability-model.md`.
 
 The orchestrator runs a capability preflight before dispatching you, but confirm
 for yourself that web search and web fetch actually work (one throwaway call

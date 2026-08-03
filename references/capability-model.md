@@ -72,6 +72,12 @@ If either layer fails for `web_search`, `web_fetch`, `read`, or `write`:
 
 `--allow-all-urls` (Claude Code) and `/allow-all` (Copilot CLI) only widen which
 URLs an **already-registered** web tool may reach. They cannot register a tool
-the harness never provided. If `web_fetch`/`web_search` are missing, granting URL
-permissions changes nothing — the preflight stays BLOCKED until a web-capable
-tool is registered.
+the agent never requested. If `web_fetch`/`web_search` are not registered for the
+agent (e.g. the profile declared tool names the harness did not recognize),
+granting URL permissions changes nothing — the preflight stays BLOCKED until the
+profile requests a tool the harness actually resolves.
+
+> Note: both harnesses provide native web tools — Claude Code as
+> `WebSearch`/`WebFetch`, Copilot CLI as `web_search`/`web_fetch`. A BLOCKED web
+> preflight means the agent's declared tools did not resolve to them, not that
+> the harness lacks web access. See the adapter docs for the per-harness names.

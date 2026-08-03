@@ -7,43 +7,54 @@
 
 ## Tool capability mapping
 
-Copilot CLI does **not** use Claude tool names. The canonical capabilities map to
-Copilot tool names as follows (source of truth: `contract/capabilities.py`):
+Copilot CLI ships **native** web and file tools. Its canonical tool names differ
+from Claude's; the bundled Copilot SDK carries this alias table (verified against
+`~/.copilot/pkg/universal/*/app.js`) — source of truth mirrored in
+`contract/capabilities.py`:
 
-| Canonical capability | Copilot tool(s) | Notes |
-|----------------------|-----------------|-------|
-| `read`               | `view` (alias `read`) | native |
-| `write`              | `edit`, `create` (alias `write`) | native |
-| `web_search`         | `web` (alias `web_search`) | **not native — see below** |
-| `web_fetch`          | `web` (aliases `web_fetch`, `fetch`) | **not native — see below** |
+| Canonical capability | Copilot native tool | Claude alias |
+|----------------------|---------------------|--------------|
+| `web_search`         | `web_search`        | `WebSearch`  |
+| `web_fetch`          | `web_fetch`         | `WebFetch`   |
+| `read`               | `view`              | `Read`       |
+| `write`              | `create` / `edit`   | `Write` / `Edit` |
 
-Do **not** declare `WebSearch`/`WebFetch`/`Read`/`Write` on a Copilot profile.
-Those names are unknown to Copilot CLI, so it registers **nothing** for them —
-no permission error, the tools are simply absent. The observed failure is that
-`researcher-1`/`verifier-1` end up with only `view`, `create`, `edit`.
+So Copilot CLI **does** provide web search and web fetch out of the box — no MCP
+server is required for research. (Confirmed by the bundled SDK, by Copilot's own
+built-in `research` agent which declares `web_search`/`web_fetch`/`view`, and by
+real session logs.)
 
-## Web tools are not shipped by Copilot CLI
+## Root cause of the "only view/create/edit" failure
 
-Copilot CLI provides file tools (`view`/`create`/`edit`) but **no web tool** out
-of the box. `web_search` and `web_fetch` must be supplied by a **web-capable MCP
-server** registered in the Copilot config, exposing a tool named `web` (or
-`web_search`/`web_fetch`/`fetch`). Until such a tool is registered, the capability
-preflight for research is **BLOCKED** — by design.
+The failure was **not** a missing web tool. `researcher-1`/`verifier-1` declared
+Claude tool names (`WebSearch, WebFetch, Read`) in their profile `tools:` field.
+Copilot's custom-agent loader does not reliably resolve Claude names in that
+field, dropped the unrecognized web names, and fell back to its default file
+tools (`view`/`create`/`edit`). No permission error — the web tools were never
+registered for the agent. (See github/copilot-sdk#1641: the tool set can differ
+across Copilot surfaces.)
 
-URL permissions (`/allow-all`, `--allow-all-urls`) only widen URL access for a
-web tool that already exists. They cannot register a missing tool and never turn
-a BLOCKED web preflight into PASS.
+**Fix:** declare the **canonical Copilot names** in the profile, exactly like
+Copilot's own research agent does:
+
+```yaml
+tools: web_search, web_fetch, view, create, edit
+```
+
+The shared `agents/*.md` profiles declare **both** name sets (Claude + Copilot)
+so a single file works on both harnesses; unrecognized names are ignored per
+harness. Do not rely on the alias map alone.
 
 ## Capability preflight (mandatory, before research)
 
 Run the shared preflight from [`capability-model.md`](capability-model.md):
 
 ```bash
-python -m contract.capabilities copilot-cli view create edit
-# -> BLOCKED (web_search, web_fetch missing); exit 1
-
-python -m contract.capabilities copilot-cli web view create edit
+python -m contract.capabilities copilot-cli web_search web_fetch view create edit
 # -> PASS; exit 0
+
+python -m contract.capabilities copilot-cli view create edit
+# -> BLOCKED (web_search, web_fetch missing) — the exact regression; exit 1
 ```
 
 Then live-probe `web_search`, `web_fetch`, `read`, `write` and record
@@ -51,12 +62,15 @@ Then live-probe `web_search`, `web_fetch`, `read`, `write` and record
 `state.status: blocked` and stop **before** writing any research artifact. No
 `curl`/parent-agent/other-agent/fabricated-source fallback.
 
+URL permissions (`/allow-all`, `--allow-all-urls`) only widen URL access for the
+existing web tools; they cannot register a tool the profile failed to request and
+never turn a BLOCKED web preflight into PASS.
+
 ## Worker dispatch
 
 - Copilot CLI dispatches profiles **sequentially**. Run each leaf researcher one
   after another — same output folders, same evidence contract, same gate, just
-  not parallel. See "Sequenzielle Degradation" in the Claude adapter for the
-  identical file/gate contract.
+  not parallel.
 - Each worker gets its sub-brief, the path to `contract/contract.md` (read, do
   not copy), its exclusive `researchers/sub-NN/` folder, and the absolute output
   paths (`findings.md`, `claims.jsonl`, `sources.jsonl`).

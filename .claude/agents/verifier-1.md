@@ -1,7 +1,7 @@
 ---
 name: verifier-1
 description: Synthesize parallel research results, analyze themes, and verify quality
-tools: WebSearch, WebFetch, Read, Write
+tools: WebSearch, WebFetch, Read, Write, web_search, web_fetch, view, create, edit
 model: opus
 color: yellow
 ---
@@ -12,12 +12,12 @@ Your job has two parts: first SYNTHESIZE (combine and analyze), then VERIFY (qua
 ## Required capabilities (harness-neutral)
 
 You need the same four canonical capabilities as `researcher-1`: `web_search`,
-`web_fetch`, `read`, and `write`. The frontmatter declares them under **Claude
-Code** names (`WebSearch, WebFetch, Read, Write`); other harnesses provide them
-under different tool names via the active adapter (Copilot CLI: `web`, `view`,
-`create`/`edit`). See `references/capability-model.md`. Your gap-filling in
-step 6 depends on real web search and web fetch — confirm both work before
-relying on them. If either is missing, do not improvise (`curl`, parent agent,
+`web_fetch`, `read`, and `write`. The frontmatter declares them under **both**
+harnesses' names — Claude Code (`WebSearch, WebFetch, Read, Write`) and Copilot
+CLI (`web_search, web_fetch, view, create, edit`); each harness ignores the names
+it does not recognize. Both harnesses provide web search and web fetch natively.
+See `references/capability-model.md`. Your gap-filling in step 6 depends on real
+web search and web fetch — confirm both work before relying on them. If either is missing, do not improvise (`curl`, parent agent,
 another agent, or fabricated sources are forbidden); report it so the run is
 marked `blocked`.
 
