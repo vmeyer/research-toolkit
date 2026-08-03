@@ -23,6 +23,31 @@ flowchart TD
 
 This pipeline runs **autonomously after the intake step**. No mid-flow user questions.
 
+### Step 0: Adapter Selection + Capability Preflight
+
+You are running under **Copilot CLI** → use `references/adapter-copilot-cli.md`
+(`platform: copilot-cli`) for dispatch and tool names.
+
+`researcher-1` and `verifier-1` need four canonical capabilities: `web_search`,
+`web_fetch`, `read`, `write`. Copilot CLI maps `read`→`view` and `write`→
+`create`/`edit`, but **ships no web tool** — `web_search`/`web_fetch` require a
+web-capable MCP server exposing `web`. Do **not** declare `WebSearch`/`WebFetch`;
+Copilot registers nothing for them.
+
+Run the preflight before any research:
+
+```bash
+python -m contract.capabilities copilot-cli <registered_tool> ...
+# only view/create/edit registered  -> BLOCKED (web_search, web_fetch); exit 1
+# web + view/create/edit registered -> PASS; exit 0
+```
+
+Then live-probe one `web_search`, one `web_fetch`, and a `write`+`read`
+round-trip. If any required capability is missing, **stop before writing any
+artifact** and report BLOCKED — no `curl`, parent-agent, other-agent, or
+fabricated-source fallback. `/allow-all` only widens URL access for an existing
+web tool; it cannot register a missing one. See `references/capability-model.md`.
+
 ### Step 1: Intake
 Run intake-1 agent. It clarifies the topic iteratively (max 5 questions), determines research depth (quick/standard/deep), output formats, language, and splits into N Sub-Briefs.
 

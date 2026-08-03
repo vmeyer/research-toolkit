@@ -149,15 +149,50 @@ research-toolkit/
 | Claude Code (plugin) | `claude --plugin-dir .` → `/research-toolkit:research-and-summarize` |
 | Claude Code (standalone) | Clone repo → `/research-and-summarize` |
 | Gemini CLI | Clone repo, skills auto-detected |
-| GitHub Copilot | Clone repo, prompts auto-detected |
+| GitHub Copilot CLI | Clone repo, prompts auto-detected (see web-tool requirement below) |
+
+### Harness adapters & capability preflight
+
+Tool names differ per harness, so the pipeline is written against four
+**canonical capabilities** — `web_search`, `web_fetch`, `read`, `write` — that
+each harness adapter maps to native tool names. The mappings live in
+[`contract/capabilities.py`](contract/capabilities.py) and are documented in
+[`references/capability-model.md`](references/capability-model.md),
+[`references/adapter-claude-code.md`](references/adapter-claude-code.md), and
+[`references/adapter-copilot-cli.md`](references/adapter-copilot-cli.md).
+
+| Capability | Claude Code | Copilot CLI |
+|------------|-------------|-------------|
+| `web_search` | `WebSearch` | `web` *(via MCP — not native)* |
+| `web_fetch`  | `WebFetch`  | `web` *(via MCP — not native)* |
+| `read`       | `Read`      | `view` |
+| `write`      | `Write`     | `create` / `edit` |
+
+Before any research runs, the orchestrator executes a **capability preflight**
+(`python -m contract.capabilities <platform> <registered_tool> ...`). If a
+required capability is not registered, the run is **BLOCKED before any artifact
+is written** — no `curl`, parent-agent, other-agent, or fabricated-source
+fallback.
+
+> **Copilot CLI needs a web tool.** Copilot CLI ships file tools
+> (`view`/`create`/`edit`) but **no web tool**. `web_search`/`web_fetch` must be
+> supplied by a web-capable MCP server exposing a `web` tool. Without it the
+> researcher/verifier see only `view`/`create`/`edit` and the preflight reports
+> BLOCKED — as designed.
+>
+> **URL permissions are not capabilities.** `--allow-all-urls` / `/allow-all`
+> only widen which URLs an *existing* web tool may reach. They cannot register a
+> missing tool and never clear a BLOCKED web preflight.
 
 ### Cross-harness mirrors
 
 The canonical v3 sources live in `agents/`, `skills/`, `commands/`, `contract/`,
-and `references/`, and are mirrored into `.claude/` for Claude Code. The other
-harness mirrors — `.gemini/`, `.github/`, `.vscode/`, `.agent/`, and `.agents/` —
-are **not** updated to v3 in this release. They continue to track the v2 pipeline
-until a separate cross-harness sync is performed.
+and `references/`, and are mirrored into `.claude/` for Claude Code. The Copilot
+CLI entrypoint (`.github/prompts/`) carries the adapter-selection and capability
+preflight so a Copilot run BLOCKS correctly when web tools are missing. The
+remaining harness mirrors — `.gemini/`, `.vscode/`, `.agent/`, and `.agents/` —
+are **not** updated to the full v3 pipeline in this release and continue to track
+v2 until a separate cross-harness sync is performed.
 
 ## License
 

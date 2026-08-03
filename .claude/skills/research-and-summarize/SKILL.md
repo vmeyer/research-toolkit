@@ -37,7 +37,34 @@ not marked `done`. Do not re-run completed sub-researchers. Never touch
 
 All steps below read/write files under `research/runs/<run-id>/`. Handoffs are
 files, never chat-only. Update `state.yaml` atomically (temp file + rename) after
-each step reaches `done`. Dispatch mechanics per `references/adapter-claude-code.md`.
+each step reaches `done`.
+
+### Step 0.5: Adapter Selection + Capability Preflight (v3)
+
+Dispatch mechanics and tool names are harness-specific. Select the adapter for
+the harness you are running under and follow it for all dispatch:
+
+- Claude Code → `references/adapter-claude-code.md` (`platform: claude-code`)
+- Copilot CLI → `references/adapter-copilot-cli.md` (`platform: copilot-cli`)
+- Unknown harness → **BLOCKED**; do not guess tool names.
+
+Then run the **capability preflight** described in
+`references/capability-model.md`. `researcher-1` and `verifier-1` both require
+`web_search`, `web_fetch`, `read`, and `write`.
+
+1. Static resolution against the harness's *registered* tools:
+   `python -m contract.capabilities <platform> <registered_tool> ...`
+   (exit 0 = PASS, exit 1 = BLOCKED).
+2. Live probe: actually run one `web_search`, one `web_fetch`, and a
+   `write`+`read` round-trip; record `preflight/capability-probe.json`.
+
+If any required capability is missing (e.g. Copilot CLI exposes only
+`view`/`create`/`edit` with no web tool), set `state.status: blocked` with the
+documented cause and **stop before any research artifact is created** — the
+`researchers/sub-*/` and `verified/` folders stay empty. Never work around a
+missing tool via `curl`, the parent agent, another research agent, or fabricated
+sources. URL permissions (`--allow-all-urls` / `/allow-all`) do not create
+missing tools and cannot clear a BLOCKED web preflight.
 
 ### Step 1: Run Intake Agent
 
