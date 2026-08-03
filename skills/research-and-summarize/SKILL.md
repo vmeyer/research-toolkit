@@ -57,13 +57,21 @@ Then run the **capability preflight** described in
    (exit 0 = PASS, exit 1 = BLOCKED). Necessary, not sufficient.
 2. **Live probe (authoritative):** actually run one `web_search`, one `web_fetch`,
    and a `write`+`read` round-trip; record `preflight/capability-probe.json`. A
-   static PASS does not prove a tool executes — on Copilot CLI `web_search` is
-   GitHub-MCP-gated and may be absent even when its name resolves.
+   static PASS does not prove a tool executes.
 
-If any required capability does not execute — the profile declared names the
-harness did not recognize (Copilot fell back to only `view`/`create`/`edit`), or
-`web_search` is not provisioned — set `state.status: blocked` with the documented
-cause and **stop before any research artifact is created** — the
+**Harness dispatch for the researcher & verifier roles:**
+
+- **Claude Code** → custom `researcher-1`/`verifier-1` sub-agents; each **writes
+  its own** sidecars. Tools: `WebSearch, WebFetch, Read, Write`.
+- **Copilot CLI** → the built-in **`research`** agent (`agent_type: research`,
+  e.g. `copilot --agent=research --autopilot --allow-all`). It has working web
+  access (web_fetch + web_search via its github-mcp toolset) but **cannot write
+  files**, so it returns findings inline and the **orchestrator** writes the
+  sidecars per `contract/contract.md`. See `references/adapter-copilot-cli.md`.
+
+If web search or web fetch does not execute in the live probe — set
+`state.status: blocked` with the documented cause and **stop before any research
+artifact is created** — the
 `researchers/sub-*/` and `verified/` folders stay empty. Never work around a
 missing tool via `curl`, the parent agent, another research agent, or fabricated
 sources. URL permissions (`--allow-all-urls` / `/allow-all`) do not create
@@ -83,30 +91,39 @@ Wait for the intake agent to complete. Parse its output to extract:
 
 ### Step 2: Run Parallel Researchers
 
-For each Sub-Brief from the intake output, spawn one `researcher-1` sub-agent. **Launch all researchers in a single message** so they execute in parallel.
+For each Sub-Brief from the intake output, dispatch one researcher per the active
+adapter (Step 0.5): on **Claude Code** spawn `researcher-1` sub-agents (launch all
+in a single message for parallelism); on **Copilot CLI** dispatch the built-in
+`research` agent (`agent_type: research`) sequentially.
 
 Each researcher receives:
 - Their specific Sub-Brief (focus, search angles, expected source types)
 - The research depth from Configuration
 - The overall Research Question for context
-- Their exclusive output folder `researchers/sub-NN/` (v3): each researcher writes
-  `findings.md`, `claims.jsonl`, and `sources.jsonl` there, reading
-  `contract/contract.md` for the schema. Handoffs are files, not chat-only.
+- Their exclusive output folder `researchers/sub-NN/` (v3): `findings.md`,
+  `claims.jsonl`, and `sources.jsonl`, per `contract/contract.md`. **Claude Code**:
+  the researcher writes these itself. **Copilot CLI**: the `research` agent returns
+  findings inline and the **orchestrator** writes them (the built-in agent has no
+  write tool). Either way handoffs are files, not chat-only.
 
-Wait for all researchers to complete. Do not reconstruct missing output from an
-agent's chat reply — verify the sidecar files exist and parse.
+Wait for all researchers to complete, then verify the sidecar files exist and
+parse — regardless of which side wrote them.
 
 ### Step 3: Run Verifier
 
-Dispatch `verifier-1` sub-agent with:
+Dispatch the verifier per the active adapter — **Claude Code**: `verifier-1`
+sub-agent; **Copilot CLI**: the built-in `research` agent for any gap-filling web
+work — with:
 - The original RESEARCH BRIEF (for alignment checking)
-- The path to the `researchers/sub-*/` folders (it reads their `claims.jsonl` and
+- The path to the `researchers/sub-*/` folders (read their `claims.jsonl` and
   `sources.jsonl` from disk)
 - The Configuration block (including `assurance`)
 
 The verifier synthesizes, normalizes to global IDs, deduplicates sources, and
 writes `verified/{analysis.md, claims.jsonl, sources.jsonl}` (plus
-`verified/issues.yaml` when `assurance: high`). Wait for it to complete.
+`verified/issues.yaml` when `assurance: high`). On **Claude Code** the verifier
+writes these; on **Copilot CLI** the `research` agent returns its synthesis inline
+and the **orchestrator** writes the `verified/` files. Wait for it to complete.
 
 ### Step 3b: Validate evidence
 
@@ -162,7 +179,7 @@ Wait for all formatters to complete. Report the output file paths to the user.
 
 **Model**: sonnet
 
-**Tools**: WebSearch, WebFetch, Read, Write (Claude Code) · web_search, web_fetch, view, create, edit (Copilot CLI)
+**Tools**: Claude Code — `WebSearch, WebFetch, Read, Write` (this profile). Copilot CLI — dispatched as the built-in `research` agent (`agent_type: research`); orchestrator writes sidecars.
 
 #### verifier_1 (Sub-Agent: verifier-1)
 
@@ -170,7 +187,7 @@ Wait for all formatters to complete. Report the output file paths to the user.
 
 **Model**: opus
 
-**Tools**: WebSearch, WebFetch, Read, Write (Claude Code) · web_search, web_fetch, view, create, edit (Copilot CLI)
+**Tools**: Claude Code — `WebSearch, WebFetch, Read, Write` (this profile). Copilot CLI — dispatched as the built-in `research` agent (`agent_type: research`); orchestrator writes `verified/`.
 
 #### detailed_1 (Sub-Agent: detailed-1)
 

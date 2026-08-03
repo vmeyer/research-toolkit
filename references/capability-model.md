@@ -78,9 +78,10 @@ granting URL permissions changes nothing — the preflight stays BLOCKED until t
 profile requests a tool the harness actually resolves.
 
 > Note: Claude Code provides both web capabilities natively
-> (`WebSearch`/`WebFetch`). Copilot CLI provides `web_fetch` natively, but
-> `web_search` is the GitHub-MCP tool `github-mcp-server-web_search` and may be
-> absent (verified: absent even with `--enable-all-github-mcp-tools`). This is
-> why static name resolution is **not sufficient** — the live probe must confirm
-> each capability actually executes. See the adapter docs for the per-harness
-> names.
+> (`WebSearch`/`WebFetch`) via the custom researcher/verifier profiles. On Copilot
+> CLI, `web_fetch` is a native builtin but `web_search` is the github-mcp tool
+> `github-mcp-server-web_search` — it only registers when the github-mcp-server is
+> engaged. The toolkit therefore dispatches the researcher/verifier roles to
+> Copilot's built-in `research` agent (`agent_type: research`), which engages
+> github-mcp and has both. Static name resolution is **not sufficient** — the live
+> probe must confirm each capability actually executes. See the adapter docs.

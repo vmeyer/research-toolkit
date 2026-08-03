@@ -2,101 +2,108 @@
 
 **Platform id:** `copilot-cli`
 
-**Capabilities:** `parallel: no (sequential dispatch)` · `dispatch: agent profile`
-· `done-signal: profile completion` · `resume: file re-validate`.
+**Capabilities:** `parallel: no (sequential dispatch)` · `dispatch: built-in
+research agent (agent_type: research)` · `done-signal: agent completion` ·
+`resume: file re-validate`.
 
-## Tool capability mapping (verified on Copilot CLI 1.0.76)
+## Web research uses the built-in `research` agent
 
-Copilot's canonical tool names differ from Claude's. Source of truth mirrored in
-`contract/capabilities.py`:
+Copilot CLI ships a built-in subagent, **`research`**, that already has working
+web access. Under this harness the researcher and verifier roles dispatch to it
+(`agent_type: research`) instead of loading our custom `researcher-1`/`verifier-1`
+profiles. It runs today:
 
-| Canonical capability | Copilot tool | Availability (tested) |
-|----------------------|--------------|-----------------------|
-| `read`               | `view`       | ✅ native |
-| `write`              | `create` / `edit` | ✅ native |
-| `web_fetch`          | `web_fetch`  | ✅ native builtin — **works** |
-| `web_search`         | `web_search` (= GitHub-MCP `github-mcp-server-web_search`) | ⚠️ **plan/org-gated — may be absent** |
+```bash
+# interactive
+/allow-all
+/autopilot
+/research <query>
 
-**Verified behaviour** (live probe against the installed CLI):
-
-- Declaring `web_fetch` in a custom agent → the agent fetched `https://example.com`
-  and returned `<title>Example Domain</title>`. `web_fetch` is a real builtin.
-- `web_search` is **not a plain builtin**. It is the GitHub-MCP tool
-  `github-mcp-server-web_search`. In testing it was unavailable **even on the
-  default agent with `--enable-all-github-mcp-tools`** — the agent reported "only
-  web_fetch". Whether it exists depends on the account/org GitHub-MCP entitlement.
-
-So Copilot has native **web fetch** but **web search is not guaranteed**. If your
-environment does not expose `web_search`, provision it (enable the GitHub-MCP
-`web_search` tool for the account, or register a search-capable MCP server) — or
-the research run will (correctly) BLOCK; see below.
-
-## Root cause of the "only view/create/edit" failure
-
-The originally-reported failure was that profiles declared **Claude** tool names
-(`WebSearch, WebFetch, Read`) that Copilot's custom-agent loader did not
-recognize; it dropped them and fell back to default file tools
-(`view`/`create`/`edit`). No permission error — the web tools were never
-registered for the agent. (See github/copilot-sdk#1641: tool sets differ across
-Copilot surfaces.)
-
-**Fix:** declare **canonical Copilot names** in the profile. The shared
-`agents/*.md` profiles declare **both** name sets (Claude + Copilot) so a single
-file works on both harnesses; each harness ignores names it does not recognize:
-
-```yaml
-tools: WebSearch, WebFetch, Read, Write, web_search, web_fetch, view, create, edit
+# non-interactive
+copilot --agent=research --autopilot --allow-all -p "<query>"
 ```
 
-This reliably restores `web_fetch`/`view`/`create`/`edit`. `web_search` resolves
-only where the environment actually provides the GitHub-MCP web_search tool — the
-live preflight below is what confirms it.
+Its declared tools (from `definitions/research.agent.yaml`, verified in 1.0.77):
+13 `github/*` tools **+ `web_fetch`, `web_search`, `grep`, `glob`, `view`**.
+
+## Why our custom agent could not web-search (answer to the open question)
+
+Web access in a custom agent is **not impossible** — we defined ours incompletely:
+
+| | Built-in `research` | Our probe (`web_search, web_fetch, view, create, edit`) |
+|---|---|---|
+| `web_fetch` | ✅ (native builtin) | ✅ worked |
+| `web_search` | ✅ | ❌ missing |
+| `github/*` tools | ✅ 13 declared → **engages github-mcp-server** | ❌ none declared |
+| write (`create`/`edit`) | ❌ not in its tools | ✅ |
+
+`web_search` **is** the github-mcp-server tool `github-mcp-server-web_search`. It
+only registers when the github-mcp-server is engaged for the agent — which the
+built-in `research` agent triggers by declaring `github/*` tools. Our probe
+declared bare `web_search` with **no** `github/*` tools, so github-mcp never
+loaded and search never registered. `web_fetch` worked because it is a standalone
+builtin. So a custom agent *can* web-search if it also declares `github/*` tools;
+we simply use the ready-made `research` agent instead.
+
+## Consequence: the built-in `research` agent cannot write files
+
+Its tool list has **no `create`/`edit`** — it reads and searches, then reports
+findings **inline** to the caller. So under Copilot the evidence-contract sidecars
+are written by the **orchestrator**, not the worker:
+
+1. Dispatch `agent_type: research` per sub-brief with the sub-brief text, the
+   triangulation instructions, and `contract/contract.md` read for the schema.
+   It returns prose findings + citations inline.
+2. The **orchestrator** (which has `create`/`edit`) writes
+   `researchers/sub-NN/{findings.md, claims.jsonl, sources.jsonl}` from those
+   findings, following `contract/contract.md`. Same schema, same validator — only
+   *who writes* differs from Claude Code (where the worker writes its own files).
+3. Verifier step: same pattern — dispatch `agent_type: research` for gap-filling
+   web work, then the orchestrator writes `verified/{analysis.md, claims.jsonl,
+   sources.jsonl}` (+ `issues.yaml` at `assurance: high`).
+
+This is the single documented divergence from the Claude adapter. Persistence,
+resume, the evidence contract, and the gate are otherwise identical.
+
+## Tool capability mapping (verified on Copilot CLI 1.0.76/1.0.77)
+
+Source of truth mirrored in `contract/capabilities.py`:
+
+| Canonical capability | Copilot tool | Availability |
+|----------------------|--------------|--------------|
+| `read`               | `view`       | ✅ native |
+| `write`              | `create` / `edit` | ✅ native (orchestrator) |
+| `web_fetch`          | `web_fetch`  | ✅ native builtin |
+| `web_search`         | `web_search` (= `github-mcp-server-web_search`) | ✅ via the `research` agent's github-mcp toolset |
 
 ## Capability preflight (mandatory, before research)
 
-Static name resolution first (necessary, not sufficient):
+Static name resolution (necessary, not sufficient):
 
 ```bash
 python -m contract.capabilities copilot-cli web_search web_fetch view create edit
-# -> PASS; exit 0  (names resolve — but see the live probe below)
-
+# -> PASS (names resolve — the live probe is authoritative)
 python -m contract.capabilities copilot-cli view create edit
-# -> BLOCKED (web_search, web_fetch missing) — the reported regression; exit 1
+# -> BLOCKED (web_search, web_fetch missing) — the original regression; exit 1
 ```
 
-**The live probe is authoritative.** On Copilot, a static PASS does not prove
-`web_search` runs — the name may resolve while the GitHub-MCP web_search tool is
-not actually provisioned. So after static resolution, actually call each
-capability once (`web_search`, `web_fetch`, and a `write`+`read` round-trip) and
-record `preflight/capability-probe.json`. If `web_search` (or any required
-capability) does not execute, treat it as BLOCKED: set `state.status: blocked`
-and stop **before** writing any research artifact. No `curl`/parent-agent/
-other-agent/fabricated-source fallback — a search-less "research" run is not an
-acceptable degradation for a triangulation pipeline.
+**The live probe is authoritative.** Before real research, dispatch
+`agent_type: research` once and have it perform one `web_search` and one
+`web_fetch`, and confirm the orchestrator can `create`+`view` a probe file.
+Record `preflight/capability-probe.json`. If web search or web fetch does not
+execute, set `state.status: blocked` and stop **before** writing any research
+artifact. No `curl`/parent-agent/other-agent/fabricated-source fallback — a
+search-less run is not an acceptable degradation for triangulation.
 
 URL permissions (`/allow-all`, `--allow-all-urls`) only widen URL access for
-tools that exist; they cannot provision the GitHub-MCP web_search tool and never
-turn a BLOCKED web preflight into PASS.
+tools that exist; they never turn a BLOCKED web preflight into PASS.
 
-## Worker dispatch
+## Dispatch, "done", state/resume
 
-- Copilot CLI dispatches profiles **sequentially**. Run each leaf researcher one
-  after another — same output folders, same evidence contract, same gate, just
-  not parallel.
-- Each worker gets its sub-brief, the path to `contract/contract.md` (read, do
-  not copy), its exclusive `researchers/sub-NN/` folder, and the absolute output
-  paths (`findings.md`, `claims.jsonl`, `sources.jsonl`).
-- Workers persist their own output; the orchestrator never reconstructs missing
-  output from a profile's chat reply.
-
-## "done" detection
-
-- Do not parse stdout. Treat a profile as done when it returns, then verify the
-  sidecars exist and parse: `python -m contract.validate_contract researchers/sub-NN`.
-
-## State/Resume
-
-- `state.yaml` is the source of truth. On re-entry: read it, re-validate the
-  referenced files, and resume at the first step not marked `done`. Persistence,
-  resume, and the evidence contract are identical to Claude Code — only dispatch
-  and tool names differ.
+- **Sequential** dispatch (one `research` agent at a time). Each gets its
+  sub-brief, `contract/contract.md`, and its target `researchers/sub-NN/` paths.
+- Do not parse stdout for control flow. When the agent returns, the orchestrator
+  writes the sidecars, then verifies: `python -m contract.validate_contract
+  researchers/sub-NN`.
+- `state.yaml` is the source of truth; on re-entry, re-validate referenced files
+  and resume at the first step not `done`.

@@ -26,18 +26,25 @@ This pipeline runs **autonomously after the intake step**. No mid-flow user ques
 ### Step 0: Adapter Selection + Capability Preflight
 
 You are running under **Copilot CLI** → use `references/adapter-copilot-cli.md`
-(`platform: copilot-cli`) for dispatch and tool names.
+(`platform: copilot-cli`).
 
-`researcher-1` and `verifier-1` need four canonical capabilities: `web_search`,
-`web_fetch`, `read`, `write`. On Copilot CLI (verified 1.0.76): `web_fetch`,
-`view`, `create`/`edit` are native; `web_search` is the GitHub-MCP tool
-`github-mcp-server-web_search` and **may be absent** (in testing it was absent
-even with `--enable-all-github-mcp-tools`). Profiles declare the Copilot names
-(the shared `agents/*.md` declare both Copilot and Claude names); declaring only
-Claude names (`WebSearch`/`WebFetch`) caused the original failure — Copilot
-dropped them and left only `view`/`create`/`edit`.
+**Dispatch the researcher and verifier roles to Copilot's built-in `research`
+agent** (`agent_type: research`) — it has working web access (`web_fetch` +
+`web_search` via its github-mcp toolset). Do **not** load our custom
+`researcher-1`/`verifier-1` profiles here; a bare `web_search` in a custom agent
+without `github/*` tools does not resolve. Run with:
 
-Run the preflight before any research:
+```bash
+copilot --agent=research --autopilot --allow-all -p "<query>"
+# or interactively: /allow-all → /autopilot → /research <query>
+```
+
+The `research` agent **cannot write files** (no create/edit), so it returns
+findings inline and **you (the orchestrator) write** the sidecars
+`researchers/sub-NN/{findings.md, claims.jsonl, sources.jsonl}` and `verified/*`
+per `contract/contract.md`.
+
+Preflight before any research:
 
 ```bash
 python -m contract.capabilities copilot-cli web_search web_fetch view create edit
@@ -46,13 +53,10 @@ python -m contract.capabilities copilot-cli view create edit
 # -> BLOCKED (web_search, web_fetch missing); exit 1  ← the original regression
 ```
 
-Then **live-probe**: actually call one `web_search`, one `web_fetch`, and a
-`write`+`read` round-trip. A static PASS does not prove `web_search` runs. If any
-required capability does not execute (e.g. Copilot has no provisioned
-`web_search`), **stop before writing any artifact** and report BLOCKED — no
-`curl`, parent-agent, other-agent, or fabricated-source fallback; a search-less
-run is not acceptable for triangulation. `/allow-all` only widens URL access for
-existing tools; it cannot provision a missing one. See
+Then **live-probe**: dispatch `agent_type: research` once to run a `web_search`
+and a `web_fetch`, and confirm you can write+read a probe file. If web search or
+fetch does not execute, **stop before writing any artifact** and report BLOCKED —
+no `curl`, parent-agent, other-agent, or fabricated-source fallback. See
 `references/capability-model.md`.
 
 ### Step 1: Intake

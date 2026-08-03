@@ -42,15 +42,17 @@ ADAPTERS: dict[str, dict[str, list[str]]] = {
         WRITE: ["Write"],
     },
     "copilot-cli": {
-        # Verified empirically against Copilot CLI 1.0.76:
+        # Verified empirically against Copilot CLI 1.0.76/1.0.77:
         #   web_fetch  — true native builtin, works when declared.
         #   view/create/edit — native file tools.
-        #   web_search — NOT a plain builtin. It is the GitHub-MCP tool
-        #     `github-mcp-server-web_search`, plan/org-gated, and was absent even
-        #     on the default agent with --enable-all-github-mcp-tools. Static
-        #     name resolution here is necessary but NOT sufficient; the live
-        #     probe must confirm web_search actually runs or the run is BLOCKED.
-        # The Claude names and a `web` MCP tool are accepted as aliases too.
+        #   web_search — the GitHub-MCP tool `github-mcp-server-web_search`. It
+        #     only registers once the github-mcp-server is engaged for the agent
+        #     (declaring `github/*` tools). Copilot's built-in `research` agent
+        #     does exactly this, so the toolkit dispatches researcher/verifier as
+        #     agent_type: research on this harness rather than a custom profile.
+        #     A bare `web_search` in a custom agent without github/* tools does
+        #     NOT resolve — that was our earlier mistake.
+        # The live probe (not this static table) is authoritative that a tool runs.
         WEB_SEARCH: [
             "web_search", "github/web_search", "github-mcp-server-web_search",
             "WebSearch", "web",
