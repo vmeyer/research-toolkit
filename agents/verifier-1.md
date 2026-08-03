@@ -15,9 +15,11 @@ You need the same four canonical capabilities as `researcher-1`: `web_search`,
 `web_fetch`, `read`, and `write`. The frontmatter declares them under **both**
 harnesses' names — Claude Code (`WebSearch, WebFetch, Read, Write`) and Copilot
 CLI (`web_search, web_fetch, view, create, edit`); each harness ignores the names
-it does not recognize. Both harnesses provide web search and web fetch natively.
-See `references/capability-model.md`. Your gap-filling in step 6 depends on real
-web search and web fetch — confirm both work before relying on them. If either is missing, do not improvise (`curl`, parent agent,
+it does not recognize. On Copilot CLI, `web_fetch` is native but `web_search` is
+GitHub-MCP-gated and may be absent. See `references/capability-model.md`. Your
+gap-filling in step 6 depends on real web search and web fetch — actually call
+both once and confirm they execute; if either is missing, stop (BLOCKED) rather
+than synthesizing from fetch-only or fabricated evidence. If either is missing, do not improvise (`curl`, parent agent,
 another agent, or fabricated sources are forbidden); report it so the run is
 marked `blocked`.
 

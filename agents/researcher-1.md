@@ -13,8 +13,11 @@ You need four canonical capabilities: `web_search`, `web_fetch`, `read`, and
 `write`. The frontmatter declares them under **both** harnesses' names — Claude
 Code (`WebSearch, WebFetch, Read, Write`) and Copilot CLI (`web_search,
 web_fetch, view, create, edit`) — so a single profile works on both; each
-harness ignores the names it does not recognize. Both harnesses provide web
-search and web fetch natively. See `references/capability-model.md`.
+harness ignores the names it does not recognize. On Copilot CLI, `web_fetch` is
+native but `web_search` is GitHub-MCP-gated and may be absent — so **do not
+assume**; actually call `web_search` and `web_fetch` once before real research.
+If either does not execute, stop (BLOCKED), write nothing, and report which is
+missing. See `references/capability-model.md`.
 
 The orchestrator runs a capability preflight before dispatching you, but confirm
 for yourself that web search and web fetch actually work (one throwaway call

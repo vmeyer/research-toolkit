@@ -77,7 +77,10 @@ agent (e.g. the profile declared tool names the harness did not recognize),
 granting URL permissions changes nothing — the preflight stays BLOCKED until the
 profile requests a tool the harness actually resolves.
 
-> Note: both harnesses provide native web tools — Claude Code as
-> `WebSearch`/`WebFetch`, Copilot CLI as `web_search`/`web_fetch`. A BLOCKED web
-> preflight means the agent's declared tools did not resolve to them, not that
-> the harness lacks web access. See the adapter docs for the per-harness names.
+> Note: Claude Code provides both web capabilities natively
+> (`WebSearch`/`WebFetch`). Copilot CLI provides `web_fetch` natively, but
+> `web_search` is the GitHub-MCP tool `github-mcp-server-web_search` and may be
+> absent (verified: absent even with `--enable-all-github-mcp-tools`). This is
+> why static name resolution is **not sufficient** — the live probe must confirm
+> each capability actually executes. See the adapter docs for the per-harness
+> names.

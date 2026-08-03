@@ -42,12 +42,19 @@ ADAPTERS: dict[str, dict[str, list[str]]] = {
         WRITE: ["Write"],
     },
     "copilot-cli": {
-        # Copilot CLI ships native web tools; the canonical names are
-        # web_search / web_fetch (verified against the bundled SDK alias table:
-        # web_fetch->WebFetch, web_search->WebSearch, view->Read, create->Write,
-        # edit->Edit). The Claude names are accepted aliases; `web` is only an
-        # optional name an MCP server might use. See adapter-copilot-cli.md.
-        WEB_SEARCH: ["web_search", "WebSearch", "web"],
+        # Verified empirically against Copilot CLI 1.0.76:
+        #   web_fetch  — true native builtin, works when declared.
+        #   view/create/edit — native file tools.
+        #   web_search — NOT a plain builtin. It is the GitHub-MCP tool
+        #     `github-mcp-server-web_search`, plan/org-gated, and was absent even
+        #     on the default agent with --enable-all-github-mcp-tools. Static
+        #     name resolution here is necessary but NOT sufficient; the live
+        #     probe must confirm web_search actually runs or the run is BLOCKED.
+        # The Claude names and a `web` MCP tool are accepted as aliases too.
+        WEB_SEARCH: [
+            "web_search", "github/web_search", "github-mcp-server-web_search",
+            "WebSearch", "web",
+        ],
         WEB_FETCH: ["web_fetch", "WebFetch", "fetch", "web"],
         READ: ["view", "Read", "read"],
         WRITE: ["create", "edit", "Write", "Edit", "write"],

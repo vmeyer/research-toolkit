@@ -54,14 +54,16 @@ Then run the **capability preflight** described in
 
 1. Static resolution against the harness's *registered* tools:
    `python -m contract.capabilities <platform> <registered_tool> ...`
-   (exit 0 = PASS, exit 1 = BLOCKED).
-2. Live probe: actually run one `web_search`, one `web_fetch`, and a
-   `write`+`read` round-trip; record `preflight/capability-probe.json`.
+   (exit 0 = PASS, exit 1 = BLOCKED). Necessary, not sufficient.
+2. **Live probe (authoritative):** actually run one `web_search`, one `web_fetch`,
+   and a `write`+`read` round-trip; record `preflight/capability-probe.json`. A
+   static PASS does not prove a tool executes — on Copilot CLI `web_search` is
+   GitHub-MCP-gated and may be absent even when its name resolves.
 
-If any required capability is missing (e.g. the profile declared tool names the
-harness did not recognize, so Copilot CLI registered only `view`/`create`/`edit`
-and dropped the web tools), set `state.status: blocked` with the documented cause
-and **stop before any research artifact is created** — the
+If any required capability does not execute — the profile declared names the
+harness did not recognize (Copilot fell back to only `view`/`create`/`edit`), or
+`web_search` is not provisioned — set `state.status: blocked` with the documented
+cause and **stop before any research artifact is created** — the
 `researchers/sub-*/` and `verified/` folders stay empty. Never work around a
 missing tool via `curl`, the parent agent, another research agent, or fabricated
 sources. URL permissions (`--allow-all-urls` / `/allow-all`) do not create

@@ -5,66 +5,78 @@
 **Capabilities:** `parallel: no (sequential dispatch)` · `dispatch: agent profile`
 · `done-signal: profile completion` · `resume: file re-validate`.
 
-## Tool capability mapping
+## Tool capability mapping (verified on Copilot CLI 1.0.76)
 
-Copilot CLI ships **native** web and file tools. Its canonical tool names differ
-from Claude's; the bundled Copilot SDK carries this alias table (verified against
-`~/.copilot/pkg/universal/*/app.js`) — source of truth mirrored in
+Copilot's canonical tool names differ from Claude's. Source of truth mirrored in
 `contract/capabilities.py`:
 
-| Canonical capability | Copilot native tool | Claude alias |
-|----------------------|---------------------|--------------|
-| `web_search`         | `web_search`        | `WebSearch`  |
-| `web_fetch`          | `web_fetch`         | `WebFetch`   |
-| `read`               | `view`              | `Read`       |
-| `write`              | `create` / `edit`   | `Write` / `Edit` |
+| Canonical capability | Copilot tool | Availability (tested) |
+|----------------------|--------------|-----------------------|
+| `read`               | `view`       | ✅ native |
+| `write`              | `create` / `edit` | ✅ native |
+| `web_fetch`          | `web_fetch`  | ✅ native builtin — **works** |
+| `web_search`         | `web_search` (= GitHub-MCP `github-mcp-server-web_search`) | ⚠️ **plan/org-gated — may be absent** |
 
-So Copilot CLI **does** provide web search and web fetch out of the box — no MCP
-server is required for research. (Confirmed by the bundled SDK, by Copilot's own
-built-in `research` agent which declares `web_search`/`web_fetch`/`view`, and by
-real session logs.)
+**Verified behaviour** (live probe against the installed CLI):
+
+- Declaring `web_fetch` in a custom agent → the agent fetched `https://example.com`
+  and returned `<title>Example Domain</title>`. `web_fetch` is a real builtin.
+- `web_search` is **not a plain builtin**. It is the GitHub-MCP tool
+  `github-mcp-server-web_search`. In testing it was unavailable **even on the
+  default agent with `--enable-all-github-mcp-tools`** — the agent reported "only
+  web_fetch". Whether it exists depends on the account/org GitHub-MCP entitlement.
+
+So Copilot has native **web fetch** but **web search is not guaranteed**. If your
+environment does not expose `web_search`, provision it (enable the GitHub-MCP
+`web_search` tool for the account, or register a search-capable MCP server) — or
+the research run will (correctly) BLOCK; see below.
 
 ## Root cause of the "only view/create/edit" failure
 
-The failure was **not** a missing web tool. `researcher-1`/`verifier-1` declared
-Claude tool names (`WebSearch, WebFetch, Read`) in their profile `tools:` field.
-Copilot's custom-agent loader does not reliably resolve Claude names in that
-field, dropped the unrecognized web names, and fell back to its default file
-tools (`view`/`create`/`edit`). No permission error — the web tools were never
-registered for the agent. (See github/copilot-sdk#1641: the tool set can differ
-across Copilot surfaces.)
+The originally-reported failure was that profiles declared **Claude** tool names
+(`WebSearch, WebFetch, Read`) that Copilot's custom-agent loader did not
+recognize; it dropped them and fell back to default file tools
+(`view`/`create`/`edit`). No permission error — the web tools were never
+registered for the agent. (See github/copilot-sdk#1641: tool sets differ across
+Copilot surfaces.)
 
-**Fix:** declare the **canonical Copilot names** in the profile, exactly like
-Copilot's own research agent does:
+**Fix:** declare **canonical Copilot names** in the profile. The shared
+`agents/*.md` profiles declare **both** name sets (Claude + Copilot) so a single
+file works on both harnesses; each harness ignores names it does not recognize:
 
 ```yaml
-tools: web_search, web_fetch, view, create, edit
+tools: WebSearch, WebFetch, Read, Write, web_search, web_fetch, view, create, edit
 ```
 
-The shared `agents/*.md` profiles declare **both** name sets (Claude + Copilot)
-so a single file works on both harnesses; unrecognized names are ignored per
-harness. Do not rely on the alias map alone.
+This reliably restores `web_fetch`/`view`/`create`/`edit`. `web_search` resolves
+only where the environment actually provides the GitHub-MCP web_search tool — the
+live preflight below is what confirms it.
 
 ## Capability preflight (mandatory, before research)
 
-Run the shared preflight from [`capability-model.md`](capability-model.md):
+Static name resolution first (necessary, not sufficient):
 
 ```bash
 python -m contract.capabilities copilot-cli web_search web_fetch view create edit
-# -> PASS; exit 0
+# -> PASS; exit 0  (names resolve — but see the live probe below)
 
 python -m contract.capabilities copilot-cli view create edit
-# -> BLOCKED (web_search, web_fetch missing) — the exact regression; exit 1
+# -> BLOCKED (web_search, web_fetch missing) — the reported regression; exit 1
 ```
 
-Then live-probe `web_search`, `web_fetch`, `read`, `write` and record
-`preflight/capability-probe.json`. On any BLOCKED capability, set
-`state.status: blocked` and stop **before** writing any research artifact. No
-`curl`/parent-agent/other-agent/fabricated-source fallback.
+**The live probe is authoritative.** On Copilot, a static PASS does not prove
+`web_search` runs — the name may resolve while the GitHub-MCP web_search tool is
+not actually provisioned. So after static resolution, actually call each
+capability once (`web_search`, `web_fetch`, and a `write`+`read` round-trip) and
+record `preflight/capability-probe.json`. If `web_search` (or any required
+capability) does not execute, treat it as BLOCKED: set `state.status: blocked`
+and stop **before** writing any research artifact. No `curl`/parent-agent/
+other-agent/fabricated-source fallback — a search-less "research" run is not an
+acceptable degradation for a triangulation pipeline.
 
-URL permissions (`/allow-all`, `--allow-all-urls`) only widen URL access for the
-existing web tools; they cannot register a tool the profile failed to request and
-never turn a BLOCKED web preflight into PASS.
+URL permissions (`/allow-all`, `--allow-all-urls`) only widen URL access for
+tools that exist; they cannot provision the GitHub-MCP web_search tool and never
+turn a BLOCKED web preflight into PASS.
 
 ## Worker dispatch
 

@@ -29,27 +29,30 @@ You are running under **Copilot CLI** → use `references/adapter-copilot-cli.md
 (`platform: copilot-cli`) for dispatch and tool names.
 
 `researcher-1` and `verifier-1` need four canonical capabilities: `web_search`,
-`web_fetch`, `read`, `write`. Copilot CLI provides all four **natively** under
-the names `web_search`, `web_fetch`, `view`, `create`/`edit`. Profiles must
-declare these Copilot names (the shared `agents/*.md` declare both Copilot and
-Claude names). Declaring only Claude names (`WebSearch`/`WebFetch`) is what
-caused the original failure — Copilot dropped the unrecognized names and left
-only `view`/`create`/`edit`.
+`web_fetch`, `read`, `write`. On Copilot CLI (verified 1.0.76): `web_fetch`,
+`view`, `create`/`edit` are native; `web_search` is the GitHub-MCP tool
+`github-mcp-server-web_search` and **may be absent** (in testing it was absent
+even with `--enable-all-github-mcp-tools`). Profiles declare the Copilot names
+(the shared `agents/*.md` declare both Copilot and Claude names); declaring only
+Claude names (`WebSearch`/`WebFetch`) caused the original failure — Copilot
+dropped them and left only `view`/`create`/`edit`.
 
 Run the preflight before any research:
 
 ```bash
 python -m contract.capabilities copilot-cli web_search web_fetch view create edit
-# -> PASS; exit 0
+# -> static PASS; exit 0  (names resolve — the live probe is authoritative)
 python -m contract.capabilities copilot-cli view create edit
 # -> BLOCKED (web_search, web_fetch missing); exit 1  ← the original regression
 ```
 
-Then live-probe one `web_search`, one `web_fetch`, and a `write`+`read`
-round-trip. If any required capability is missing, **stop before writing any
-artifact** and report BLOCKED — no `curl`, parent-agent, other-agent, or
-fabricated-source fallback. `/allow-all` only widens URL access for the existing
-web tools; it cannot register a tool the profile failed to request. See
+Then **live-probe**: actually call one `web_search`, one `web_fetch`, and a
+`write`+`read` round-trip. A static PASS does not prove `web_search` runs. If any
+required capability does not execute (e.g. Copilot has no provisioned
+`web_search`), **stop before writing any artifact** and report BLOCKED — no
+`curl`, parent-agent, other-agent, or fabricated-source fallback; a search-less
+run is not acceptable for triangulation. `/allow-all` only widens URL access for
+existing tools; it cannot provision a missing one. See
 `references/capability-model.md`.
 
 ### Step 1: Intake

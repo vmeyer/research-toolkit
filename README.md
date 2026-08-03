@@ -161,31 +161,38 @@ each harness adapter maps to native tool names. The mappings live in
 [`references/adapter-claude-code.md`](references/adapter-claude-code.md), and
 [`references/adapter-copilot-cli.md`](references/adapter-copilot-cli.md).
 
-| Capability | Claude Code | Copilot CLI (native) |
-|------------|-------------|----------------------|
-| `web_search` | `WebSearch` | `web_search` |
-| `web_fetch`  | `WebFetch`  | `web_fetch` |
+| Capability | Claude Code | Copilot CLI (verified 1.0.76) |
+|------------|-------------|-------------------------------|
+| `web_search` | `WebSearch` | `web_search` — GitHub-MCP-gated, **may be absent** |
+| `web_fetch`  | `WebFetch`  | `web_fetch` — native, works |
 | `read`       | `Read`      | `view` |
 | `write`      | `Write`     | `create` / `edit` |
 
-Both harnesses provide web search and web fetch **natively** — Copilot's names
-are verified against its bundled SDK alias table. Before any research runs, the
-orchestrator executes a **capability preflight**
-(`python -m contract.capabilities <platform> <registered_tool> ...`). If a
-required capability is not registered for the agent, the run is **BLOCKED before
-any artifact is written** — no `curl`, parent-agent, other-agent, or
-fabricated-source fallback.
+Claude Code provides both web capabilities natively. Copilot CLI provides
+`web_fetch` natively (verified: it fetched `example.com` in a live probe), but
+`web_search` is the GitHub-MCP tool `github-mcp-server-web_search` — plan/org-
+gated, and in testing it was **absent even with `--enable-all-github-mcp-tools`**.
+
+Before any research runs, the orchestrator runs a **two-layer capability
+preflight**: static name resolution
+(`python -m contract.capabilities <platform> <registered_tool> ...`) **plus a
+live probe** that actually calls each capability. If any required capability
+(including `web_search`) does not execute, the run is **BLOCKED before any
+artifact is written** — no `curl`, parent-agent, other-agent, or fabricated-source
+fallback. A search-less run is not an acceptable degradation for a triangulation
+pipeline.
 
 > **Declare the harness's own tool names.** The original failure was a profile
-> declaring Claude names (`WebSearch, WebFetch`) that Copilot's custom-agent
-> loader did not recognize — it dropped them and fell back to only
-> `view`/`create`/`edit`. The shared `agents/*.md` profiles now declare **both**
-> name sets, so a single file works on both harnesses (each ignores the names it
-> doesn't know). No MCP server is required for research.
+> declaring only Claude names (`WebSearch, WebFetch`) that Copilot's custom-agent
+> loader did not recognize — it dropped them and fell back to `view`/`create`/
+> `edit`. The shared `agents/*.md` profiles now declare **both** name sets, so a
+> single file works on both harnesses (each ignores names it doesn't know). This
+> reliably restores `web_fetch`; `web_search` additionally requires the GitHub-MCP
+> web_search tool (or a search MCP) to be provisioned in the environment.
 >
 > **URL permissions are not capabilities.** `--allow-all-urls` / `/allow-all`
-> only widen which URLs an *existing* web tool may reach. They cannot register a
-> tool the profile failed to request and never clear a BLOCKED web preflight.
+> only widen which URLs an *existing* web tool may reach. They cannot provision a
+> missing tool and never clear a BLOCKED web preflight.
 
 ### Cross-harness mirrors
 
