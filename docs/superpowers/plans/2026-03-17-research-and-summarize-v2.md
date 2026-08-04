@@ -6,7 +6,7 @@
 
 **Architecture:** Intake (opus) → N × Researcher (sonnet, parallel) → Verifier (opus, merged analyzer+verifier) → Formatter(s) (parallel). Single user interaction point at intake. Source traceability enforced throughout.
 
-**Tech Stack:** Claude Code agents (markdown definitions), CC Workflow Studio (JSON workflow), HTML/CSS (report template)
+**Tech Stack:** Claude Code agents (markdown definitions), HTML/CSS (report template)
 
 **Spec:** `docs/superpowers/specs/2026-03-17-research-and-summarize-v2-design.md`
 
@@ -394,49 +394,9 @@ git commit -m "feat: add research-dashboard skill for aggregating HTML reports"
 
 ---
 
-### Task 10: Update Workflow JSON
+### Task 10: ~~Update Workflow JSON~~ (obsolet)
 
-**Files:**
-- Modify: `.vscode/workflows/research-and-summarize.json`
-
-Update the CC Workflow Studio JSON to reflect the new pipeline. Note: the static workflow cannot express dynamic parallel fan-out (N researchers), so it shows a single researcher node. The actual parallelism is handled at runtime by the SKILL.md.
-
-- [ ] **Step 1: Rewrite the workflow JSON**
-
-Changes:
-1. **Remove nodes:** `analyzer-1`, `ask-verify-1`, `ask-format-1`, `bullets-1`
-2. **Add node:** `html-report-1` (type: subAgent, with full prompt from agent definition)
-3. **Update node:** `intake-1` — model: opus, updated prompt
-4. **Update node:** `researcher-1` — updated prompt with triangulation strategy
-5. **Update node:** `verifier-1` — merged analyzer+verifier prompt
-6. **Update node:** `keypoints-1` — model: sonnet
-7. **Update connections:**
-   - start → intake-1 → researcher-1 → verifier-1 → [brief-1, detailed-1, html-report-1, keypoints-1] → end
-8. **Reposition nodes** for clean left-to-right layout
-9. **Update** `updatedAt` timestamp
-
-- [ ] **Step 2: Verify JSON is valid**
-
-```bash
-python3 -c "import json; json.load(open('.vscode/workflows/research-and-summarize.json')); print('valid')"
-```
-
-Expected: `valid`
-
-- [ ] **Step 3: Verify no references to removed nodes**
-
-```bash
-grep -c "analyzer\|ask-verify\|ask-format\|bullets" .vscode/workflows/research-and-summarize.json
-```
-
-Expected: 0
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add .vscode/workflows/research-and-summarize.json
-git commit -m "feat: update workflow JSON for v2 pipeline"
-```
+> Entfällt. Der zugehörige visuelle Workflow-Editor und seine JSON-Artefakte werden nicht mehr verwendet und wurden aus dem Projekt entfernt. Die Pipeline wird ausschließlich zur Laufzeit durch die SKILL.md gesteuert.
 
 ---
 
