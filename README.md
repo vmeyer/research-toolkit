@@ -117,47 +117,64 @@ This reads all HTML reports from `./research/` and creates a static `index.html`
 
 ## Project structure
 
+The repository **root is the plugin**: `.claude-plugin/plugin.json` plus the
+canonical `agents/`, `skills/`, `commands/`, `contract/`, and `references/`
+directories. It is the single source of truth.
+
 ```
 research-toolkit/
 ├── .claude-plugin/
-│   └── plugin.json              # Plugin manifest
-├── agents/                      # Agent definitions (plugin)
-│   ├── intake-1.md
-│   ├── researcher-1.md
-│   ├── verifier-1.md
-│   ├── detailed-1.md
-│   ├── html-report-1.md
-│   ├── keypoints-1.md
-│   └── brief-1.md
-├── skills/                      # Skills (plugin)
+│   ├── plugin.json              # Plugin manifest
+│   └── marketplace.json         # Marketplace catalog (enables /plugin install)
+├── agents/                      # Agent definitions (canonical, 9 agents)
+├── skills/                      # Skills (canonical)
 │   ├── research-and-summarize/
 │   └── research-dashboard/
-├── commands/                    # Slash commands (plugin)
+├── commands/                    # Slash commands (canonical, Claude Code)
+├── contract/                    # Evidence contract spec + Python validator
+├── references/                  # Harness adapter references
 ├── templates/
 │   └── report.html              # HTML report template
-├── .claude/                     # Standalone config (for direct use)
-│   ├── agents/
-│   └── commands/
-├── .gemini/skills/              # Gemini CLI support
-└── .github/prompts/             # GitHub Copilot support
+├── scripts/
+│   └── sync-claude-mirror.sh    # Regenerates .claude/ from root
+└── .claude/                     # GENERATED standalone mirror — DO NOT EDIT
+    └── agents/ commands/ skills/ contract/ references/
 ```
+
+`.claude/` is **generated** from the root sources by
+`scripts/sync-claude-mirror.sh`; never edit it by hand. Run the script after
+changing any canonical source, and `./scripts/sync-claude-mirror.sh --check`
+in CI to catch drift.
 
 ## Cross-platform support
 
 | Platform | How to use |
 |----------|------------|
-| Claude Code (plugin) | `claude --plugin-dir .` → `/research-toolkit:research-and-summarize` |
-| Claude Code (standalone) | Clone repo → `/research-and-summarize` |
-| Gemini CLI | Clone repo, skills auto-detected |
-| GitHub Copilot | Clone repo, prompts auto-detected |
+| Claude Code (marketplace) | `/plugin marketplace add vmeyer/research-toolkit` → `/plugin install research-toolkit@research-toolkit` |
+| Claude Code (plugin dir) | `claude --plugin-dir .` → `/research-toolkit:research-and-summarize` |
+| Claude Code (standalone) | Clone repo, open in Claude Code → `/research-and-summarize` (uses generated `.claude/`) |
+| GitHub Copilot CLI | Shared plugin format — auto-detects `.claude-plugin/plugin.json`; **skills** run natively (see caveats) |
 
-### Cross-harness mirrors
+### One source, shared format
 
-The canonical v3 sources live in `agents/`, `skills/`, `commands/`, `contract/`,
-and `references/`, and are mirrored into `.claude/` for Claude Code. The other
-harness mirrors — `.gemini/`, `.github/`, `.vscode/`, `.agent/`, and `.agents/` —
-are **not** updated to v3 in this release. They continue to track the v2 pipeline
-until a separate cross-harness sync is performed.
+Claude Code, GitHub Copilot CLI, and VS Code share a single plugin format and
+all resolve `.claude-plugin/plugin.json`, so the root plugin serves them
+directly — no per-tool mirror is maintained. The only generated artifact is
+`.claude/`, for the "open the repo directly without installing" path.
+
+**GitHub Copilot caveats** (Copilot's plugin format differs from Claude's in two
+places):
+
+- **Skills** (`skills/**/SKILL.md`) work natively — same format.
+- **Slash commands** (`commands/`) are **Claude-only**; Copilot has no commands
+  component. Trigger the research skill directly instead.
+- **Agents** — Copilot expects `agents/*.agent.md`; the canonical `agents/*.md`
+  are not auto-registered as Copilot custom agents. Full sub-agent pipeline
+  parity on Copilot is tracked separately.
+
+Other harnesses (Codex CLI, opencode, Antigravity, …) consume the portable
+`SKILL.md` skills through their own install mechanisms and are not mirrored in
+this repo.
 
 ## License
 
