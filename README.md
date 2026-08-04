@@ -136,14 +136,16 @@ research-toolkit/
 ├── templates/
 │   └── report.html              # HTML report template
 ├── scripts/
-│   └── sync-claude-mirror.sh    # Regenerates .claude/ from root
+│   └── sync-mirrors.sh          # Regenerates .claude/ + .codex-plugin/ from root
+├── .codex-plugin/
+│   └── plugin.json              # GENERATED Codex CLI manifest — DO NOT EDIT
 └── .claude/                     # GENERATED standalone mirror — DO NOT EDIT
     └── agents/ commands/ skills/ contract/ references/
 ```
 
-`.claude/` is **generated** from the root sources by
-`scripts/sync-claude-mirror.sh`; never edit it by hand. Run the script after
-changing any canonical source, and `./scripts/sync-claude-mirror.sh --check`
+`.claude/` and `.codex-plugin/plugin.json` are **generated** from the root
+sources by `scripts/sync-mirrors.sh`; never edit them by hand. Run the script
+after changing any canonical source, and `./scripts/sync-mirrors.sh --check`
 in CI to catch drift.
 
 ## Cross-platform support
@@ -154,27 +156,29 @@ in CI to catch drift.
 | Claude Code (plugin dir) | `claude --plugin-dir .` → `/research-toolkit:research-and-summarize` |
 | Claude Code (standalone) | Clone repo, open in Claude Code → `/research-and-summarize` (uses generated `.claude/`) |
 | GitHub Copilot CLI | Shared plugin format — auto-detects `.claude-plugin/plugin.json`; **skills** run natively (see caveats) |
+| Codex CLI | Install the plugin; Codex reads the generated `.codex-plugin/plugin.json` (**skills** only, see caveats) |
 
 ### One source, shared format
 
 Claude Code, GitHub Copilot CLI, and VS Code share a single plugin format and
 all resolve `.claude-plugin/plugin.json`, so the root plugin serves them
-directly — no per-tool mirror is maintained. The only generated artifact is
-`.claude/`, for the "open the repo directly without installing" path.
+directly — no per-tool mirror is maintained. Codex CLI uses a parallel manifest
+(`.codex-plugin/plugin.json`), which is **generated** from the same
+`plugin.json` so it never drifts. The generated artifacts are therefore just
+`.claude/` (standalone path) and `.codex-plugin/plugin.json` (Codex).
 
-**GitHub Copilot caveats** (Copilot's plugin format differs from Claude's in two
-places):
+**Harness caveats** — the pipeline is skill-orchestrated, so **skills**
+(`skills/**/SKILL.md`) run natively everywhere. Two Claude-specific pieces do
+not port:
 
-- **Skills** (`skills/**/SKILL.md`) work natively — same format.
-- **Slash commands** (`commands/`) are **Claude-only**; Copilot has no commands
-  component. Trigger the research skill directly instead.
-- **Agents** — Copilot expects `agents/*.agent.md`; the canonical `agents/*.md`
-  are not auto-registered as Copilot custom agents. Full sub-agent pipeline
-  parity on Copilot is tracked separately.
+- **Slash commands** (`commands/`) are **Claude-only** — neither Copilot nor
+  Codex has a commands component. Trigger the research skill directly instead.
+- **Agents** — Copilot expects `agents/*.agent.md` and Codex plugins declare no
+  agents at all; the canonical `agents/*.md` are not auto-registered on either.
+  Full sub-agent pipeline parity on non-Claude harnesses is tracked separately.
 
-Other harnesses (Codex CLI, opencode, Antigravity, …) consume the portable
-`SKILL.md` skills through their own install mechanisms and are not mirrored in
-this repo.
+opencode and Antigravity are intentionally out of scope; they can still consume
+the portable `SKILL.md` skills through their own install mechanisms.
 
 ## License
 

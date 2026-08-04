@@ -1,0 +1,12 @@
+{
+  "name": "research-toolkit",
+  "version": "3.0.0",
+  "description": "Multi-agent research pipeline with parallel web research, triangulation strategy, source verification, and formatted output generation. Includes a research dashboard for aggregating results across multiple research sessions.",
+  "author": {
+    "name": "Volker Meyer"
+  },
+  "homepage": "https://github.com/vmeyer/research-toolkit",
+  "repository": "https://github.com/vmeyer/research-toolkit",
+  "license": "MIT",
+  "skills": "./skills/"
+}
