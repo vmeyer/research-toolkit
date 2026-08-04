@@ -25,12 +25,23 @@ You give it a topic. It clarifies what you need, splits the research into parall
 ### Pipeline
 
 ```
-Intake (opus) → N × Researcher (sonnet, parallel) → Verifier (opus) → Formatter(s) (parallel)
+Intake (opus) → N × Researcher (sonnet, parallel) → Verifier (opus) → validate
+   → [ Evidence Gate ⟳ rework ≤2 → final-critic ]  (assurance: high only)
+   → Formatter(s) (parallel) → outputs
 ```
 
-![Research Pipeline](diagrams/research-pipeline/excalidraw/research-pipeline.png)
+![Research pipeline — the full v3 flow](diagrams/research-pipeline/excalidraw/research-pipeline.png)
 
-**Single interaction point.** The intake agent asks clarifying questions one at a time (max 5). After that, the entire pipeline runs without interruption.
+*Read it left→right: a single intake, a parallel **fan-out** of researchers, **convergence** at the verifier, contract validation, and — on `assurance: high` — a blocking **evidence gate** with a bounded **rework loop** back to the verifier, then a **fan-out** to the selected formatters. Purple = LLM sub-agents (model in parentheses); the green track is the "passed" path, red is `BLOCKED`, amber is the rework loop.*
+
+**How a run flows**
+
+0. **Resume check** — if a `running` run exists for the topic slug under `research/runs/<id>/`, re-validate its files and continue at the first unfinished step instead of restarting.
+1. **`intake-1`** (opus) — the *single* interaction point: clarifies the topic (≤5 questions), sets the two dials, output formats and language, and splits the topic into 2–4 sub-briefs. Everything after this runs without interruption.
+2. **`researcher-1` ×N** (sonnet, parallel) — one per sub-brief, launched together. Each searches with the triangulation strategy and writes its own `findings.md` + `claims.jsonl` + `sources.jsonl` to disk (handoffs are files, never chat-only).
+3. **`verifier-1`** (opus) — merges the researchers, normalizes to global claim/source IDs, deduplicates, and writes `verified/{analysis,claims,sources}` (+ `issues.yaml` on `assurance: high`).
+4. **validate + evidence gate** — `contract.validate_contract` checks the sidecars. On `assurance: standard` this only warns; on `assurance: high` a blocking gate resolves to `PASS` / `PASS_WITH_GAPS` / `REWORK` (targeted re-research, ≤2 rounds) / `BLOCKED`, and a read-only **`final-critic-1`** checks the draft against the contract before anything is formatted.
+5. **formatters** (parallel) — only the selected ones (`detailed-1`, `html-report-1`, `keypoints-1`, `brief-1`, `decision-1`) run, each consuming the verified handoff, writing to `research/<slug>/`.
 
 ### Agents
 
@@ -65,6 +76,10 @@ orthogonal dials**:
 |------|--------|------------------|
 | `depth` | `quick` · `standard` · `deep` | How much the researchers search (breadth of sources). |
 | `assurance` | `standard` · `high` | How hard the evidence is checked before it ships. |
+
+![The two dials and the evidence contract](diagrams/control-model/excalidraw/control-model.png)
+
+*The control model at a glance: the two dials (top), the two sidecar files every step emits with a real line of each — `claims.jsonl` classified `fact` / `inference` / `recommendation` / `gap` and `sources.jsonl` anchored by id — the validator that enforces schema + cross-references + the dual-source rule, and the four evidence-gate outcomes that apply on `assurance: high`.*
 
 Every research step now emits a **machine-readable evidence contract** — two
 sidecar files, `claims.jsonl` (one atomic claim per line, classified as
